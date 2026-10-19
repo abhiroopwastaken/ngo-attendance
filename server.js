@@ -10,25 +10,44 @@ const { DatabaseSync } = require('node:sqlite');
 const HTTP_PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
-const DATA_DIR = path.join(__dirname, 'data');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+// Detect Vercel Serverless environment
+const isVercel = !!(process.env.VERCEL || process.env.NOW_REGION);
+const BASE_STORAGE_DIR = isVercel ? '/tmp' : __dirname;
+
+const DATA_DIR = path.join(BASE_STORAGE_DIR, 'data');
+const UPLOADS_DIR = path.join(BASE_STORAGE_DIR, 'uploads');
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const CERTS_DIR = path.join(__dirname, 'certs');
+const CERTS_DIR = path.join(BASE_STORAGE_DIR, 'certs');
 const DB_PATH = path.join(DATA_DIR, 'attendance.db');
 const CSV_PATH = path.join(DATA_DIR, 'attendance_records.csv');
 
-// Ensure directories exist
-for (const dir of [DATA_DIR, UPLOADS_DIR, PUBLIC_DIR, CERTS_DIR]) {
+// Ensure writable directories exist
+for (const dir of [DATA_DIR, UPLOADS_DIR, CERTS_DIR]) {
   if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (e) {}
   }
 }
 
-// Generate self-signed SSL certs if missing for mobile HTTPS
+// On Vercel, copy seed database from bundle to /tmp if not already there
+if (isVercel) {
+  const seedDbPath = path.join(__dirname, 'data', 'attendance.db');
+  if (fs.existsSync(seedDbPath) && !fs.existsSync(DB_PATH)) {
+    try {
+      fs.copyFileSync(seedDbPath, DB_PATH);
+    } catch (e) {
+      console.warn('Could not copy seed database to /tmp:', e.message);
+    }
+  }
+}
+
+// Generate self-signed SSL certs if missing for local mobile HTTPS (skipped on Vercel / Cloud)
 const KEY_PATH = path.join(CERTS_DIR, 'server.key');
 const CERT_PATH = path.join(CERTS_DIR, 'server.crt');
 
 function ensureSslCerts() {
+  if (isVercel) return; // Vercel provides automatic edge SSL
   if (!fs.existsSync(KEY_PATH) || !fs.existsSync(CERT_PATH)) {
     try {
       console.log('Generating local SSL certificate for mobile HTTPS...');
@@ -509,6 +528,10 @@ async function handleRequest(req, res) {
   };
 
   const readBody = () => new Promise((resolve, reject) => {
+    if (req.body !== undefined && req.body !== null) {
+      if (typeof req.body === 'string') return resolve(req.body);
+      return resolve(JSON.stringify(req.body));
+    }
     let body = '';
     req.on('data', chunk => {
       body += chunk;
@@ -930,33 +953,38 @@ async function handleRequest(req, res) {
   }
 }
 
-// Start HTTP Server
-const httpServer = http.createServer(handleRequest);
-httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
-  console.log(`\n============================================================`);
-  console.log(`📋 NGO Field Attendance Server Running!`);
-  console.log(`• Desktop (Local):  http://localhost:${HTTP_PORT}`);
-  console.log(`• Phone (HTTP):     http://${localIp}:${HTTP_PORT}`);
-  console.log(`============================================================`);
-});
+// Start standalone server when executed directly (npm start / node server.js)
+if (require.main === module) {
+  const httpServer = http.createServer(handleRequest);
+  httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
+    console.log(`\n============================================================`);
+    console.log(`📋 NGO Field Attendance Server Running!`);
+    console.log(`• Desktop (Local):  http://localhost:${HTTP_PORT}`);
+    console.log(`• Phone (HTTP):     http://${localIp}:${HTTP_PORT}`);
+    console.log(`============================================================`);
+  });
 
-// Start HTTPS Server (Only needed locally for Phone Camera & GPS permissions; cloud hosts like Render handle SSL on port 443 automatically)
-const isCloudHosting = !!(process.env.RENDER || (process.env.PORT && process.env.PORT !== '3000' && !process.env.HTTPS_PORT));
+  // Start HTTPS Server (Only needed locally for Phone Camera & GPS permissions; cloud hosts handle SSL on port 443 automatically)
+  const isCloudHosting = !!(process.env.RENDER || (process.env.PORT && process.env.PORT !== '3000' && !process.env.HTTPS_PORT));
 
-if (!isCloudHosting && fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
-  try {
-    const sslOptions = {
-      key: fs.readFileSync(KEY_PATH),
-      cert: fs.readFileSync(CERT_PATH)
-    };
-    const httpsServer = https.createServer(sslOptions, handleRequest);
-    httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
-      console.log(`🔒 SECURE HTTPS SERVER (Required for Phone Camera & GPS):`);
-      console.log(`• Desktop (HTTPS):  https://localhost:${HTTPS_PORT}`);
-      console.log(`• Phone (HTTPS):    https://${localIp}:${HTTPS_PORT}  <-- USE THIS ON PHONE!`);
-      console.log(`============================================================\n`);
-    });
-  } catch (sslErr) {
-    console.warn('Could not start HTTPS server:', sslErr.message);
+  if (!isCloudHosting && fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
+    try {
+      const sslOptions = {
+        key: fs.readFileSync(KEY_PATH),
+        cert: fs.readFileSync(CERT_PATH)
+      };
+      const httpsServer = https.createServer(sslOptions, handleRequest);
+      httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+        console.log(`🔒 SECURE HTTPS SERVER (Required for Phone Camera & GPS):`);
+        console.log(`• Desktop (HTTPS):  https://localhost:${HTTPS_PORT}`);
+        console.log(`• Phone (HTTPS):    https://${localIp}:${HTTPS_PORT}  <-- USE THIS ON PHONE!`);
+        console.log(`============================================================\n`);
+      });
+    } catch (sslErr) {
+      console.warn('Could not start HTTPS server:', sslErr.message);
+    }
   }
 }
+
+// Export request handler for Vercel Serverless Functions
+module.exports = handleRequest;
