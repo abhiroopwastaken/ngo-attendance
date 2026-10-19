@@ -4,6 +4,17 @@ A mobile-optimized attendance web application built specifically for NGO field w
 
 ---
 
+## ⚡ 1-Click Free Cloud Deployment (Vercel)
+
+Deploy to Vercel in 60 seconds with **Zero Credit Card Required**:
+
+1. Click here: **[Deploy with Vercel](https://vercel.com/new/clone?repository-url=https://github.com/abhiroopwastaken/ngo-attendance)**
+2. Sign in with GitHub.
+3. Click **Deploy**.
+4. In under 60 seconds, you get a fast, global `https://your-ngo.vercel.app` URL with automatic trusted HTTPS for phones!
+
+---
+
 ## 🔒 Worker Privacy & Manager Dashboard
 
 To safeguard worker privacy while giving NGO leadership complete oversight:
