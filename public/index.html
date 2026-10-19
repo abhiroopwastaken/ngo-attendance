@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>NGO Field Attendance</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- HTTPS / Phone Permission Warning Banner (Shown only on insecure mobile HTTP) -->
+  <aside id="httpsNoticeBanner" class="https-notice-banner" style="display:none;" aria-live="polite">
+    <div class="https-banner-inner">
+      <div class="https-icon-wrap">🔒</div>
+      <div class="https-text-wrap">
+        <strong class="https-title">Enable Phone Camera & GPS</strong>
+        <p class="https-desc">
+          Mobile browsers (Safari & Chrome) require HTTPS to grant GPS and camera permissions.
+        </p>
+      </div>
+      <a id="btnSwitchHttps" href="#" class="btn btn-sm btn-primary https-switch-btn">
+        Switch to HTTPS ↗
+      </a>
+    </div>
+  </aside>
+
+  <!-- Top App Bar -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Field Attendance</h1>
+          <p class="brand-subtitle" id="orgNameSubtitle">NGO Field Operations</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span class="live-dot"></span>
+        <span id="headerClock">--:--</span>
+        <button type="button" class="btn-manager-portal" id="btnOpenManagerPortal" onclick="handleManagerPortalClick()" title="Manager Portal">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>Manager</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-nav">
+      <button type="button" class="tab-btn active" id="tabMarkBtn" onclick="switchTab('mark')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        Mark Attendance
+      </button>
+      <button type="button" class="tab-btn" id="tabRecordsBtn" onclick="switchTab('records')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+        </svg>
+        My History
+        <span class="badge" id="recordsCountBadge">0</span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-body">
+    <!-- TAB 1: MARK ATTENDANCE -->
+    <section id="sectionMark" class="tab-section active">
+      <form id="attendanceForm" autocomplete="off" onsubmit="handleAttendanceSubmit(event)">
+        
+        <!-- Check-In vs Check-Out Action Selector -->
+        <div class="card punch-mode-card" id="punchModeCard">
+          <div class="punch-mode-header">
+            <span class="punch-mode-title">Attendance Action</span>
+            <span class="current-duty-badge" id="currentDutyBadge">Not Checked In</span>
+          </div>
+
+          <div class="punch-type-toggle">
+            <button type="button" class="punch-type-btn active check-in" id="btnSelectCheckIn" onclick="setPunchType('CHECK-IN')">
+              <span class="punch-indicator-dot check-in"></span>
+              <div class="punch-type-labels">
+                <span class="punch-type-title">Check-In</span>
+                <span class="punch-type-sub">Duty Arrival</span>
+              </div>
+            </button>
+
+            <button type="button" class="punch-type-btn check-out" id="btnSelectCheckOut" onclick="setPunchType('CHECK-OUT')">
+              <span class="punch-indicator-dot check-out"></span>
+              <div class="punch-type-labels">
+                <span class="punch-type-title">Check-Out</span>
+                <span class="punch-type-sub">Duty Departure</span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Active duty banner (shown when worker is currently checked in) -->
+          <div id="activeCheckInBanner" class="active-checkin-banner" style="display:none;">
+            <div class="active-checkin-content">
+              <span class="active-checkin-icon">⏱️</span>
+              <div class="active-checkin-text">
+                <strong id="activeCheckInSite">Currently on Duty</strong>
+                <span id="activeCheckInTime">Checked in --</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-checkout" onclick="setPunchType('CHECK-OUT')">
+              Ready to Leave? Check Out →
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Timestamp & GPS Card -->
+        <div class="card meta-card">
+          <div class="meta-row">
+            <div class="meta-item">
+              <span class="meta-label">Current Timestamp</span>
+              <span class="meta-value" id="liveTimestampDisplay">Acquiring time...</span>
+            </div>
+            <button type="button" class="btn-icon" id="btnRefreshGps" onclick="refreshGpsLocation()" title="Refresh GPS">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- GPS Status & Coordinates -->
+          <div class="gps-status-box" id="gpsStatusBox">
+            <div class="gps-indicator">
+              <span class="gps-dot waiting" id="gpsDot"></span>
+              <span id="gpsStatusText">Acquiring GPS location...</span>
+            </div>
+            <!-- Human-Readable Address -->
+            <div class="gps-address-box" id="gpsAddressBox" style="display:none;">
+              <span class="gps-address-icon">📍</span>
+              <span class="gps-address-text" id="gpsAddressText">Resolving address...</span>
+            </div>
+            <div class="gps-coords" id="gpsCoordsText">Lat: -- | Lng: --</div>
+          </div>
+
+          <!-- Insecure HTTP GPS Warning & Manual Coordinates Fallback -->
+          <div id="gpsHelpContainer" class="gps-help-box" style="display:none;">
+            <p id="gpsHelpMessage" class="gps-help-text"></p>
+            <div class="gps-help-actions">
+              <button type="button" class="btn btn-sm btn-outline" id="btnToggleManualCoords" onclick="toggleManualCoordinates()">
+                Enter Coords Manually
+              </button>
+              <a href="#" id="gpsHttpsLink" class="btn btn-sm btn-primary" style="display:none;">
+                Use HTTPS for Auto-GPS
+              </a>
+            </div>
+
+            <div id="manualCoordsFields" style="display:none; margin-top:10px;">
+              <div class="manual-coords-grid">
+                <div>
+                  <label class="form-label" style="font-size:0.75rem;">Latitude</label>
+                  <input type="number" step="any" id="manualLatInput" class="form-input form-input-sm" placeholder="e.g. 28.6139" oninput="handleManualCoordsChange()">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:0.75rem;">Longitude</label>
+                  <input type="number" step="any" id="manualLngInput" class="form-input form-input-sm" placeholder="e.g. 77.2090" oninput="handleManualCoordsChange()">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photograph Capture Card -->
+        <div class="card photo-card">
+          <div class="card-header-row">
+            <span class="card-title">Field Photograph *</span>
+            <span class="card-badge" id="photoStatusBadge">Photo Required</span>
+          </div>
+          <p class="card-desc">Take a verification photo or selfie at the field visit site.</p>
+
+          <!-- Camera Stream / Preview Box -->
+          <div class="camera-viewport" id="cameraViewport">
+            <!-- Live Video (when WebRTC is active) -->
+            <video id="cameraVideo" autoplay playsinline muted class="camera-video" style="display:none;"></video>
+            <!-- Canvas for snapshot & compression -->
+            <canvas id="cameraCanvas" style="display:none;"></canvas>
+            <!-- Image Preview -->
+            <img id="photoPreviewImg" alt="Captured field photo" class="photo-preview-img" style="display:none;">
+
+            <!-- Watermark Preview -->
+            <div class="photo-watermark" id="photoWatermark" style="display:none;">
+              <span id="watermarkTime"></span>
+              <span id="watermarkCoords"></span>
+            </div>
+
+            <!-- Viewport Placeholder -->
+            <div class="camera-placeholder" id="cameraPlaceholder">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              <span>Tap below to capture photo</span>
+            </div>
+          </div>
+
+          <!-- Camera Controls (Works on both HTTP and HTTPS!) -->
+          <div class="camera-actions">
+            <!-- State 1: When no photo is taken -->
+            <div class="btn-group-vertical" id="cameraInitGroup">
+              <!-- Primary Action: Native Smartphone Camera (Works on ANY phone & HTTP/HTTPS) -->
+              <label class="btn btn-primary btn-block file-upload-btn" id="btnNativeCamera">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+                <span>Take Photo (Phone Camera)</span>
+                <!-- capture="environment" launches rear camera, works on iOS Safari & Android Chrome -->
+                <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleFileSelect(event)">
+              </label>
+
+              <!-- Secondary Actions: Live Viewfinder (if supported) & Gallery -->
+              <div class="btn-group">
+                <button type="button" class="btn btn-outline" id="btnLiveCamera" onclick="startLiveCamera()">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                  </svg>
+                  Live Viewfinder
+                </button>
+
+                <label class="btn btn-outline file-upload-btn">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  Gallery
+                  <input type="file" id="galleryInput" accept="image/*" onchange="handleFileSelect(event)">
+                </label>
+              </div>
+            </div>
+
+            <!-- State 2: When live viewfinder is running -->
+            <div class="camera-live-controls" id="cameraLiveControls" style="display:none;">
+              <button type="button" class="btn-icon-round" onclick="switchCameraFacing()" title="Flip Camera">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 2.21.895 4.21 2.343 5.657L4 20h4.343"></path>
+                  <path d="M4 14c0 4.418 3.582 8 8 8s8-3.582 8-8c0-2.21-.895-4.21-2.343-5.657L20 4h-4.343"></path>
+                </svg>
+              </button>
+
+              <button type="button" class="shutter-btn" onclick="captureSnapshot()" title="Capture Photo">
+                <span class="shutter-inner"></span>
+              </button>
+
+              <button type="button" class="btn-icon-round" onclick="stopLiveCamera()" title="Cancel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <!-- State 3: When photo has been captured -->
+            <div class="btn-group" id="cameraRetakeGroup" style="display:none;">
+              <button type="button" class="btn btn-outline btn-block" onclick="retakePhoto()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 4v6h6"></path>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                Retake Photo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Field Worker Details Card -->
+        <div class="card">
+          <div class="card-title">Field Worker Details</div>
+          
+          <div class="form-group">
+            <label for="workerName" class="form-label">Worker Full Name *</label>
+            <input type="text" id="workerName" class="form-input" placeholder="e.g. Rahul Verma" required>
+          </div>
+
+          <div class="form-group">
+            <label for="workerId" class="form-label">Worker ID / Phone Number *</label>
+            <input type="text" id="workerId" class="form-input" placeholder="e.g. NGO-204 or +91 9876543210" required>
+          </div>
+
+          <div class="form-check">
+            <input type="checkbox" id="rememberMeCheck" checked>
+            <label for="rememberMeCheck">Remember my name & supervisor details on this phone</label>
+          </div>
+        </div>
+
+        <!-- Purpose & Site Details Card -->
+        <div class="card">
+          <div class="card-title">Visit & Location Details</div>
+
+          <div class="form-group">
+            <label for="purposeInput" class="form-label" id="purposeLabel">Purpose of Visit / Duty *</label>
+            <input type="text" id="purposeInput" class="form-input" placeholder="e.g. Beneficiary Survey, Relief Distribution, Site Inspection" required>
+          </div>
+
+          <div class="form-group">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+              <label for="siteName" class="form-label" style="margin-bottom:0;">Village / Site / Location Name *</label>
+              <span class="auto-fill-tag" id="siteAutoTag" style="display:none;">Auto-detected from GPS ✓</span>
+            </div>
+            <input type="text" id="siteName" class="form-input" placeholder="Auto-filling from location..." required>
+          </div>
+
+          <div class="form-group">
+            <label for="notesInput" class="form-label">Field Notes / Remarks (Optional)</label>
+            <textarea id="notesInput" class="form-input" rows="2" placeholder="e.g. Distributed 45 ration kits; surveyed 12 families"></textarea>
+          </div>
+        </div>
+
+        <!-- Supervisor Details Card -->
+        <div class="card">
+          <div class="card-title">Supervisor Details</div>
+
+          <div class="form-group">
+            <label for="supervisorName" class="form-label">Supervisor Name *</label>
+            <input type="text" id="supervisorName" class="form-input" placeholder="e.g. Anjali Mehta" required>
+          </div>
+
+          <div class="form-group">
+            <label for="supervisorContact" class="form-label">Supervisor Phone / Email</label>
+            <input type="text" id="supervisorContact" class="form-input" placeholder="e.g. +91 9123456789 or anjali@ngo.org">
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="submit-container">
+          <button type="submit" class="btn btn-primary btn-submit btn-checkin" id="submitBtn">
+            <svg id="submitBtnIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span id="submitBtnText">PUNCH CHECK-IN</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- TAB 2: WORKER'S PERSONAL HISTORY (PRIVATE TO EACH WORKER) -->
+    <section id="sectionRecords" class="tab-section" style="display:none;">
+      
+      <!-- Worker History Card -->
+      <div class="card worker-history-card">
+        <div class="worker-history-header">
+          <div>
+            <div class="card-title">My Attendance History</div>
+            <p class="sheet-desc" id="workerHistorySubtitle">Only your verified attendance records on this device are shown here.</p>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline" onclick="loadWorkerHistory(true)">
+            ↻ Refresh
+          </button>
+        </div>
+
+        <div id="workerIdentityBanner" class="worker-identity-banner" style="display:none;">
+          <span>👤 Viewing history for Worker ID:</span>
+          <strong id="displayWorkerIdBadge">--</strong>
+        </div>
+
+        <div id="workerIdMissingNotice" class="worker-prompt-box" style="display:none;">
+          <p>Please enter your <strong>Worker ID</strong> on the Mark Attendance tab to view your punches.</p>
+          <button type="button" class="btn btn-sm btn-primary" onclick="switchTab('mark')">Go to Mark Attendance</button>
+        </div>
+      </div>
+
+      <!-- Worker's Records Filter Pills -->
+      <div class="records-filter-pills" id="workerFilterPills" style="display:none;">
+        <button type="button" class="filter-pill active" id="pillFilterAll" onclick="setRecordFilter('ALL')">
+          All My Punches (<span id="countAllPill">0</span>)
+        </button>
+        <button type="button" class="filter-pill" id="pillFilterCheckIn" onclick="setRecordFilter('CHECK-IN')">
+          🟢 Check-Ins (<span id="countCheckInPill">0</span>)
+        </button>
+        <button type="button" class="filter-pill" id="pillFilterCheckOut" onclick="setRecordFilter('CHECK-OUT')">
+          🔴 Check-Outs (<span id="countCheckOutPill">0</span>)
+        </button>
+      </div>
+
+      <!-- Worker's Personal Records Feed List -->
+      <div id="recordsList" class="records-container">
+        <!-- Injected dynamically with only current worker's punches -->
+      </div>
+    </section>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MANAGER PORTAL MODALS -->
+  <!-- ========================================================================= -->
+
+  <!-- 1. Manager PIN Authentication Modal -->
+  <div class="modal-backdrop" id="managerPinModal" style="display:none;" onclick="handleModalBackdropClick(event)">
+    <div class="modal-sheet modal-pin-box">
+      <div class="modal-header">
+        <h3 class="modal-title">🔒 Project Manager Access</h3>
+        <button type="button" class="btn-icon" onclick="closeManagerPinModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body text-center">
+        <p class="modal-desc" style="margin-bottom: 16px;">
+          Enter your 4-digit Manager PIN to unlock the master attendance feed, CSV export, and Google Sheet controls.
+        </p>
+
+        <form id="managerPinForm" onsubmit="submitManagerPin(event)">
+          <div class="pin-input-wrap">
+            <input type="password" id="managerPinInput" class="form-input pin-input" maxlength="8" inputmode="numeric" placeholder="Enter PIN" autocomplete="off" autofocus>
+          </div>
+
+          <div id="pinErrorMessage" class="pin-error-text" style="display:none;"></div>
+
+          <div class="keypad-grid">
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('1')">1</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('2')">2</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('3')">3</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('4')">4</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('5')">5</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('6')">6</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('7')">7</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('8')">8</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('9')">9</button>
+            <button type="button" class="keypad-btn keypad-fn" onclick="clearPinInput()">Clear</button>
+            <button type="button" class="keypad-btn" onclick="appendPinDigit('0')">0</button>
+            <button type="submit" class="keypad-btn keypad-ok">OK</button>
+          </div>
+
+          <p style="font-size: 0.72rem; color: #94a3b8; margin-top: 12px;">Default PIN is <strong>2026</strong>. You can change this once logged in.</p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Manager Full Dashboard Modal -->
+  <div class="modal-backdrop" id="managerDashboardModal" style="display:none;">
+    <div class="modal-sheet modal-fullscreen">
+      <div class="modal-header manager-dash-header">
+        <div>
+          <div class="manager-dash-title">
+            <span class="manager-badge-pill">MANAGER PORTAL</span>
+            <h3>Field Attendance Dashboard</h3>
+          </div>
+          <p class="manager-dash-sub">Overseeing all NGO field workers and attendance synchronization</p>
+        </div>
+        <div class="manager-header-actions">
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="lockManagerPortal()">
+            🔒 Lock / Exit
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-body manager-dash-body">
+        <!-- Manager Quick Controls Bar -->
+        <div class="card manager-controls-card">
+          <div class="manager-stats-grid">
+            <div class="manager-stat-box">
+              <span class="manager-stat-num" id="statTotalPunches">0</span>
+              <span class="manager-stat-label">Total Punches</span>
+            </div>
+            <div class="manager-stat-box">
+              <span class="manager-stat-num stat-green" id="statCheckIns">0</span>
+              <span class="manager-stat-label">Check-Ins</span>
+            </div>
+            <div class="manager-stat-box">
+              <span class="manager-stat-num stat-orange" id="statCheckOuts">0</span>
+              <span class="manager-stat-label">Check-Outs</span>
+            </div>
+          </div>
+
+          <!-- Master Action Buttons -->
+          <div class="manager-actions-row">
+            <a id="btnManagerExportCsv" href="/api/export.csv" class="btn btn-success" download>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download Full CSV Report
+            </a>
+
+            <button type="button" class="btn btn-primary" onclick="syncPendingRecords()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+              Sync to Google Sheet (<span id="managerUnsyncedCount">0</span> pending)
+            </button>
+
+            <button type="button" class="btn btn-outline" onclick="openSheetConfigModal()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              Sheet Settings
+            </button>
+
+            <button type="button" class="btn btn-outline" onclick="openChangePinModal()">
+              🔑 Change PIN
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="manager-filter-bar">
+          <div class="records-filter-pills">
+            <button type="button" class="filter-pill active" id="pillManagerFilterAll" onclick="setManagerFilter('ALL')">
+              All Workers (<span id="countManagerAll">0</span>)
+            </button>
+            <button type="button" class="filter-pill" id="pillManagerFilterCheckIn" onclick="setManagerFilter('CHECK-IN')">
+              🟢 Check-Ins (<span id="countManagerCheckIn">0</span>)
+            </button>
+            <button type="button" class="filter-pill" id="pillManagerFilterCheckOut" onclick="setManagerFilter('CHECK-OUT')">
+              🔴 Check-Outs (<span id="countManagerCheckOut">0</span>)
+            </button>
+          </div>
+
+          <div class="search-bar-wrap" style="margin-top: 10px;">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="managerSearchInput" class="search-input" placeholder="Search any worker name, ID, site, purpose, or supervisor..." oninput="filterManagerRecords(this.value)">
+          </div>
+        </div>
+
+        <!-- Full Attendance Feed -->
+        <div id="managerRecordsList" class="records-container" style="margin-top: 14px;">
+          <!-- Injected dynamically with all workers' punches -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Change Manager PIN Modal -->
+  <div class="modal-backdrop" id="changePinModal" style="display:none;" onclick="handleModalBackdropClick(event)">
+    <div class="modal-sheet modal-pin-box">
+      <div class="modal-header">
+        <h3 class="modal-title">🔑 Change Manager PIN</h3>
+        <button type="button" class="btn-icon" onclick="closeChangePinModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <form onsubmit="submitChangePin(event)">
+          <div class="form-group">
+            <label class="form-label">Current PIN</label>
+            <input type="password" id="inputCurrentPin" class="form-input" required maxlength="8" inputmode="numeric" placeholder="Enter current PIN">
+          </div>
+          <div class="form-group">
+            <label class="form-label">New PIN (Minimum 4 digits)</label>
+            <input type="password" id="inputNewPin" class="form-input" required minlength="4" maxlength="8" inputmode="numeric" placeholder="Enter new PIN">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New PIN</label>
+            <input type="password" id="inputConfirmNewPin" class="form-input" required minlength="4" maxlength="8" inputmode="numeric" placeholder="Confirm new PIN">
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-outline" onclick="closeChangePinModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Update PIN</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  </main>
+
+  <!-- Google Sheet Configuration Modal -->
+  <div class="modal-backdrop" id="sheetConfigModal" style="display:none;" onclick="handleModalBackdropClick(event)">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h3 class="modal-title">Connect Google Sheet</h3>
+        <button type="button" class="btn-icon" onclick="closeSheetConfigModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Target Sheet Link Banner -->
+        <div style="background: #f1f5f9; padding: 12px 14px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="min-width: 0;">
+            <div style="font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Linked Google Sheet</div>
+            <div style="font-size: 0.8rem; font-weight: 600; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="currentSheetDisplay">
+              https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s
+            </div>
+          </div>
+          <a id="btnOpenGoogleSheet" href="https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit?usp=sharing" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="white-space: nowrap; flex-shrink: 0;">
+            Open Sheet ↗
+          </a>
+        </div>
+
+        <p class="modal-desc" style="margin-bottom: 14px;">
+          Choose how you want to connect this sheet to the app. Records are always safely logged into the local server CSV spreadsheet as well.
+        </p>
+
+        <!-- Form for Google Sheet Settings -->
+        <form id="sheetSettingsForm" onsubmit="saveSheetSettings(event)">
+          <div class="form-group">
+            <label for="googleSheetUrlInput" class="form-label">Google Sheet URL</label>
+            <input type="url" id="googleSheetUrlInput" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit?usp=sharing" oninput="updateSheetOpenLink()">
+          </div>
+
+          <div style="margin: 16px 0; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+            <h4 style="font-size: 0.9rem; font-weight: 700; color: #1e293b; margin-bottom: 6px;">
+              Option 1: Google Apps Script Webhook (Recommended)
+            </h4>
+            <p style="font-size: 0.78rem; color: #475569; margin-bottom: 10px;">
+              Fastest setup directly from your Google Sheet.
+            </p>
+
+            <div class="form-group">
+              <label for="googleWebhookInput" class="form-label">Apps Script Webhook URL</label>
+              <input type="url" id="googleWebhookInput" class="form-input" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+
+            <div class="btn-group" style="margin-bottom: 12px;">
+              <button type="button" class="btn btn-outline" onclick="testSheetWebhook()">
+                Test Webhook Connection
+              </button>
+              <button type="submit" class="btn btn-primary">
+                Save Settings
+              </button>
+            </div>
+          </div>
+
+          <!-- Troubleshooting & Quick Guide -->
+          <details class="setup-guide" open>
+            <summary class="setup-summary">
+              <span>⚠️ Why Webhooks fail & 30-Second Fix</span>
+            </summary>
+            <div class="setup-content">
+              <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.78rem; color: #991b1b;">
+                <strong>Why you got the error earlier:</strong>
+                <ul style="margin: 4px 0 0 16px; padding: 0;">
+                  <li><strong>Who has access:</strong> Google defaults to <em>"Only myself"</em>. This completely blocks incoming pings. It <strong>MUST be set to "Anyone"</strong>.</li>
+                  <li><strong>New Version required:</strong> Saving the script does NOT update the web app URL. You must click <strong>Deploy → New deployment</strong> (or Manage deployments → Edit → New version).</li>
+                </ul>
+              </div>
+
+              <ol class="setup-steps">
+                <li>Open your sheet: <a href="https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit" target="_blank" rel="noopener"><strong>Click here to open Google Sheet</strong></a>.</li>
+                <li>In the top menu, click <strong>Extensions</strong> → <strong>Apps Script</strong>.</li>
+                <li>Delete everything in <code>Code.gs</code> and paste the exact script below:</li>
+              </ol>
+
+              <div class="code-box">
+                <button type="button" class="btn-copy" onclick="copyAppsScriptCode()">Copy Script</button>
+                <pre><code id="appsScriptSnippet">function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: "active", message: "Attendance webhook is online and ready!" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getActiveSheet();
+    
+    // Auto-create headers if sheet is empty
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow([
+        "Record ID", "Timestamp", "Date & Time", "Punch Type", "Worker Name", 
+        "Worker ID", "Purpose / Activity", "Site / Location", "Readable Address", 
+        "Supervisor Name", "Supervisor Contact", "Latitude", "Longitude", 
+        "Accuracy (m)", "Google Maps Link", "Photo URL", "Notes"
+      ]);
+      sheet.getRange(1, 1, 1, 17).setFontWeight("bold").setBackground("#e2e8f0");
+    }
+    
+    var data = JSON.parse(e.postData.contents);
+    sheet.appendRow([
+      data.id,
+      data.timestamp,
+      data.formatted_time,
+      data.entry_type || "CHECK-IN",
+      data.worker_name,
+      data.worker_id,
+      data.purpose,
+      data.site_name,
+      data.address || "",
+      data.supervisor_name,
+      data.supervisor_contact || "",
+      data.latitude || "",
+      data.longitude || "",
+      data.accuracy || "",
+      data.maps_url || "",
+      data.photo_url || "",
+      data.notes || ""
+    ]);
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "ok" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}</code></pre>
+              </div>
+
+              <ol class="setup-steps" start="4">
+                <li>Click the 💾 <strong>Save Project</strong> icon (or press <code>Cmd + S</code> / <code>Ctrl + S</code>). <em>(Google will not deploy un-saved code!)</em></li>
+                <li>Click <strong>Deploy</strong> → <strong>Manage deployments</strong> → click the <strong>✏️ Edit (Pencil)</strong> icon → under <em>Version</em>, select <strong>New version</strong> → click <strong>Deploy</strong>.</li>
+                <li>(Or click <strong>Deploy</strong> → <strong>New deployment</strong> → Web app → Execute as: <strong>Me</strong> → Who has access: <strong>Anyone</strong>).</li>
+                <li>Copy the resulting Web App URL, paste it above, and click <strong>Test Webhook Connection</strong>!</li>
+              </ol>
+            </div>
+          </details>
+
+          <!-- Option 2: Service Account (Direct Google API) -->
+          <details class="setup-guide" style="margin-top: 14px;">
+            <summary class="setup-summary">
+              <span>Option 2: Direct Google Cloud Service Account (No Webhooks)</span>
+            </summary>
+            <div class="setup-content">
+              <p style="font-size: 0.78rem; color: #475569; margin-bottom: 8px;">
+                If you have a Google Cloud Service Account JSON key (e.g. <code>credentials.json</code>), paste it here or drop it into the app directory.
+                Then share your sheet with the service account email as <strong>Editor</strong>. The server will use Google Sheets API v4 directly!
+              </p>
+              <div class="form-group">
+                <label for="serviceAccountJsonInput" class="form-label">Service Account JSON</label>
+                <textarea id="serviceAccountJsonInput" class="form-input" rows="3" placeholder='{"type": "service_account", "client_email": "...", "private_key": "..."}' style="font-family: monospace; font-size: 0.72rem;"></textarea>
+              </div>
+              <div class="btn-group">
+                <button type="button" class="btn btn-outline" onclick="testServiceAccountConnection()">
+                  Test Direct API Connection
+                </button>
+              </div>
+            </div>
+          </details>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div class="modal-backdrop" id="successModal" style="display:none;">
+    <div class="modal-sheet modal-success">
+      <div class="success-icon-wrap">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h3 class="modal-title text-center">Attendance Marked!</h3>
+      <p class="modal-desc text-center" id="successSubtitle">Your check-in has been successfully recorded.</p>
+
+      <div class="success-details" id="successDetails">
+        <!-- Injected dynamically -->
+      </div>
+
+      <div class="btn-group">
+        <button type="button" class="btn btn-primary" onclick="closeSuccessModalAndReset()">
+          New Check-In
+        </button>
+        <button type="button" class="btn btn-outline" onclick="closeSuccessModalAndGoToRecords()">
+          View Records & Sheet
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <!-- Photo Full Preview Modal -->
+  <div class="modal-backdrop" id="photoModal" style="display:none;" onclick="closePhotoModal()">
+    <div class="photo-modal-content">
+      <img id="fullPhotoImg" src="" alt="Full attendance photo">
+      <div class="photo-modal-meta" id="photoModalMeta"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

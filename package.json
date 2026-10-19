@@ -1,0 +1,24 @@
+{
+  "name": "ngo-field-attendance",
+  "version": "1.0.0",
+  "description": "Mobile-first Field Worker Attendance Web App with GPS, Photo Capture, and Sheet Export for NGOs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "attendance",
+    "ngo",
+    "field-workers",
+    "gps",
+    "geolocation",
+    "mobile-camera",
+    "google-sheets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
