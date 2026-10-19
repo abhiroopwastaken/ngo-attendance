@@ -76,73 +76,161 @@ function getLocalIp() {
 }
 const localIp = getLocalIp();
 
-// Initialize SQLite DB
-const db = new DatabaseSync(DB_PATH);
+// Universal Database Store (Supports native node:sqlite on Node 22+ with pure JS fallback for Node 20 / Vercel)
+let stmtInsert, stmtGetAll, stmtGetByWorker, stmtGetUnsynced, stmtGetWorkerLatest, stmtMarkSynced, getSetting, setSetting;
+let hasNativeSqlite = false;
+let db = null;
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS attendance (
-    id TEXT PRIMARY KEY,
-    entry_type TEXT NOT NULL DEFAULT 'CHECK-IN',
-    created_at TEXT NOT NULL,
-    formatted_time TEXT NOT NULL,
-    worker_name TEXT NOT NULL,
-    worker_id TEXT NOT NULL,
-    purpose TEXT NOT NULL,
-    site_name TEXT NOT NULL,
-    address TEXT DEFAULT '',
-    supervisor_name TEXT NOT NULL,
-    supervisor_contact TEXT,
-    notes TEXT,
-    latitude REAL,
-    longitude REAL,
-    accuracy REAL,
-    maps_url TEXT,
-    photo_filename TEXT,
-    synced_to_sheet INTEGER DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-`);
-
-// Safe migration for existing databases: add entry_type and address if missing
 try {
-  db.exec(`ALTER TABLE attendance ADD COLUMN entry_type TEXT DEFAULT 'CHECK-IN'`);
-} catch (e) {}
-try {
-  db.exec(`ALTER TABLE attendance ADD COLUMN address TEXT DEFAULT ''`);
-} catch (e) {}
+  const { DatabaseSync } = require('node:sqlite');
+  db = new DatabaseSync(DB_PATH);
 
-// Prepared statements
-const stmtInsert = db.prepare(`
-  INSERT INTO attendance (
-    id, entry_type, created_at, formatted_time, worker_name, worker_id,
-    purpose, site_name, address, supervisor_name, supervisor_contact,
-    notes, latitude, longitude, accuracy, maps_url, photo_filename, synced_to_sheet
-  ) VALUES (
-    ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?
-  )
-`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS attendance (
+      id TEXT PRIMARY KEY,
+      entry_type TEXT NOT NULL DEFAULT 'CHECK-IN',
+      created_at TEXT NOT NULL,
+      formatted_time TEXT NOT NULL,
+      worker_name TEXT NOT NULL,
+      worker_id TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      site_name TEXT NOT NULL,
+      address TEXT DEFAULT '',
+      supervisor_name TEXT NOT NULL,
+      supervisor_contact TEXT,
+      notes TEXT,
+      latitude REAL,
+      longitude REAL,
+      accuracy REAL,
+      maps_url TEXT,
+      photo_filename TEXT,
+      synced_to_sheet INTEGER DEFAULT 0
+    );
 
-const stmtGetAll = db.prepare(`SELECT * FROM attendance ORDER BY datetime(created_at) DESC`);
-const stmtGetByWorker = db.prepare(`SELECT * FROM attendance WHERE worker_id = ? ORDER BY datetime(created_at) DESC`);
-const stmtGetUnsynced = db.prepare(`SELECT * FROM attendance WHERE synced_to_sheet = 0 ORDER BY datetime(created_at) ASC`);
-const stmtGetWorkerLatest = db.prepare(`SELECT * FROM attendance WHERE worker_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`);
-const stmtMarkSynced = db.prepare(`UPDATE attendance SET synced_to_sheet = 1 WHERE id = ?`);
-const stmtGetSetting = db.prepare(`SELECT value FROM settings WHERE key = ?`);
-const stmtSetSetting = db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`);
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
 
-function getSetting(key, defaultValue = '') {
-  const row = stmtGetSetting.get(key);
-  return row ? row.value : defaultValue;
-}
+  try {
+    db.exec(`ALTER TABLE attendance ADD COLUMN entry_type TEXT DEFAULT 'CHECK-IN'`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE attendance ADD COLUMN address TEXT DEFAULT ''`);
+  } catch (e) {}
 
-function setSetting(key, value) {
-  stmtSetSetting.run(key, String(value || ''));
+  const rawStmtInsert = db.prepare(`
+    INSERT INTO attendance (
+      id, entry_type, created_at, formatted_time, worker_name, worker_id,
+      purpose, site_name, address, supervisor_name, supervisor_contact,
+      notes, latitude, longitude, accuracy, maps_url, photo_filename, synced_to_sheet
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?
+    )
+  `);
+
+  const rawStmtGetAll = db.prepare(`SELECT * FROM attendance ORDER BY datetime(created_at) DESC`);
+  const rawStmtGetByWorker = db.prepare(`SELECT * FROM attendance WHERE worker_id = ? ORDER BY datetime(created_at) DESC`);
+  const rawStmtGetUnsynced = db.prepare(`SELECT * FROM attendance WHERE synced_to_sheet = 0 ORDER BY datetime(created_at) ASC`);
+  const rawStmtGetWorkerLatest = db.prepare(`SELECT * FROM attendance WHERE worker_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`);
+  const rawStmtMarkSynced = db.prepare(`UPDATE attendance SET synced_to_sheet = 1 WHERE id = ?`);
+  const rawStmtGetSetting = db.prepare(`SELECT value FROM settings WHERE key = ?`);
+  const rawStmtSetSetting = db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`);
+
+  stmtInsert = { run: (...args) => rawStmtInsert.run(...args) };
+  stmtGetAll = { all: () => rawStmtGetAll.all() };
+  stmtGetByWorker = { all: (wId) => rawStmtGetByWorker.all(wId) };
+  stmtGetUnsynced = { all: () => rawStmtGetUnsynced.all() };
+  stmtGetWorkerLatest = { get: (wId) => rawStmtGetWorkerLatest.get(wId) };
+  stmtMarkSynced = { run: (id) => rawStmtMarkSynced.run(id) };
+  getSetting = (key, def = '') => {
+    const row = rawStmtGetSetting.get(key);
+    return row ? row.value : def;
+  };
+  setSetting = (key, val) => rawStmtSetSetting.run(key, String(val || ''));
+
+  hasNativeSqlite = true;
+} catch (err) {
+  console.warn('node:sqlite not available on this Node runtime. Using universal JSON store fallback:', err.message);
+
+  const JSON_DB_PATH = path.join(DATA_DIR, 'attendance_store.json');
+  let memoryStore = {
+    attendance: [],
+    settings: {
+      google_sheet_url: 'https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit?usp=sharing',
+      google_sheet_webhook_url: 'https://script.google.com/macros/s/AKfycbwM8sMlKlG49sVHQGDK49xAwncOXAUiwxteEDbVIr_L2MzJpHVxx-lm-KNdfkdB230/exec',
+      manager_pin: '2026',
+      organization_name: 'NGO Field Operations'
+    }
+  };
+
+  const loadMemoryStore = () => {
+    if (fs.existsSync(JSON_DB_PATH)) {
+      try {
+        memoryStore = JSON.parse(fs.readFileSync(JSON_DB_PATH, 'utf8'));
+      } catch (e) {}
+    }
+  };
+  const saveMemoryStore = () => {
+    try {
+      fs.writeFileSync(JSON_DB_PATH, JSON.stringify(memoryStore, null, 2));
+    } catch (e) {}
+  };
+  loadMemoryStore();
+
+  stmtInsert = {
+    run: (id, entry_type, created_at, formatted_time, worker_name, worker_id, purpose, site_name, address, supervisor_name, supervisor_contact, notes, latitude, longitude, accuracy, maps_url, photo_filename, synced_to_sheet) => {
+      loadMemoryStore();
+      const rec = { id, entry_type, created_at, formatted_time, worker_name, worker_id, purpose, site_name, address, supervisor_name, supervisor_contact, notes, latitude, longitude, accuracy, maps_url, photo_filename, synced_to_sheet };
+      memoryStore.attendance.unshift(rec);
+      saveMemoryStore();
+    }
+  };
+  stmtGetAll = {
+    all: () => {
+      loadMemoryStore();
+      return [...memoryStore.attendance].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+  };
+  stmtGetByWorker = {
+    all: (workerId) => {
+      loadMemoryStore();
+      return memoryStore.attendance.filter(r => String(r.worker_id).trim() === String(workerId).trim());
+    }
+  };
+  stmtGetUnsynced = {
+    all: () => {
+      loadMemoryStore();
+      return memoryStore.attendance.filter(r => !r.synced_to_sheet);
+    }
+  };
+  stmtGetWorkerLatest = {
+    get: (workerId) => {
+      loadMemoryStore();
+      const list = memoryStore.attendance.filter(r => String(r.worker_id).trim() === String(workerId).trim());
+      return list.length ? list[0] : null;
+    }
+  };
+  stmtMarkSynced = {
+    run: (id) => {
+      loadMemoryStore();
+      const item = memoryStore.attendance.find(r => r.id === id);
+      if (item) item.synced_to_sheet = 1;
+      saveMemoryStore();
+    }
+  };
+  getSetting = (key, def = '') => {
+    loadMemoryStore();
+    return memoryStore.settings[key] !== undefined ? memoryStore.settings[key] : def;
+  };
+  setSetting = (key, val) => {
+    loadMemoryStore();
+    memoryStore.settings[key] = String(val || '');
+    saveMemoryStore();
+  };
 }
 
 function getManagerPin() {
@@ -506,7 +594,7 @@ const MIME_TYPES = {
 async function handleRequest(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Manager-PIN');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -514,13 +602,21 @@ async function handleRequest(req, res) {
     return;
   }
 
-  const isHttps = !!(req.socket.encrypted || req.headers['x-forwarded-proto'] === 'https');
+  const isHttps = !!((req.socket && req.socket.encrypted) || req.headers['x-forwarded-proto'] === 'https');
   const protocol = isHttps ? 'https' : 'http';
   const port = isHttps ? HTTPS_PORT : HTTP_PORT;
   const host = req.headers.host || `${localIp}:${port}`;
   const baseUrl = `${protocol}://${host}`;
   const parsedUrl = new URL(req.url, baseUrl);
-  const pathname = parsedUrl.pathname;
+
+  let pathname = parsedUrl.pathname;
+  if (parsedUrl.searchParams.has('_api_path')) {
+    pathname = '/api/' + parsedUrl.searchParams.get('_api_path');
+  } else if (parsedUrl.searchParams.has('_upload_file')) {
+    pathname = '/uploads/' + parsedUrl.searchParams.get('_upload_file');
+  } else if (req.headers['x-matched-path']) {
+    pathname = req.headers['x-matched-path'];
+  }
 
   const sendJson = (data, status = 200) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });

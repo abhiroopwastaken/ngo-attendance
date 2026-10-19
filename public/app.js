@@ -840,7 +840,15 @@ async function handleAttendanceSubmit(event) {
       body: JSON.stringify(payload)
     });
 
-    const result = await res.json();
+    let result;
+    const resText = await res.text();
+    try {
+      result = JSON.parse(resText);
+    } catch (parseErr) {
+      console.error('Non-JSON response from server:', res.status, resText);
+      showToast(`Server error (${res.status}): ${resText.slice(0, 120) || 'Check server logs'}`);
+      return;
+    }
 
     if (result.success) {
       vibrateDevice([50, 50, 150]);
@@ -853,7 +861,7 @@ async function handleAttendanceSubmit(event) {
     }
   } catch (err) {
     console.error('Submission error:', err);
-    showToast('Network error: Could not connect to server.');
+    showToast('Network error: ' + (err.message || 'Could not connect to server'));
   } finally {
     dom.submitBtn.disabled = false;
     dom.submitBtnText.textContent = isCheckOut ? 'PUNCH CHECK-OUT' : 'PUNCH CHECK-IN';
