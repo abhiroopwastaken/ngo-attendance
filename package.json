@@ -1,7 +1,7 @@
 {
-  "name": "ngo-field-attendance",
+  "name": "jklfdp-attendance-system",
   "version": "1.0.0",
-  "description": "Mobile-first Field Worker Attendance Web App with GPS, Photo Capture, and Sheet Export for NGOs",
+  "description": "JKLFDP Daily Attendance Web App for J&K, Leh and Ladakh with GPS, Photo Capture, and Sheet Export",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

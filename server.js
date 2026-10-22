@@ -163,7 +163,7 @@ try {
       google_sheet_url: 'https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit?usp=sharing',
       google_sheet_webhook_url: 'https://script.google.com/macros/s/AKfycbwM8sMlKlG49sVHQGDK49xAwncOXAUiwxteEDbVIr_L2MzJpHVxx-lm-KNdfkdB230/exec',
       manager_pin: '2026',
-      organization_name: 'NGO Field Operations'
+      organization_name: 'JKLFDP - J&K, Leh and Ladakh'
     }
   };
 
@@ -886,7 +886,7 @@ async function handleRequest(req, res) {
           has_service_account: !!creds,
           service_account_email: creds ? creds.client_email : null,
           active_integration_method: activeMethod,
-          organization_name: getSetting('organization_name', 'NGO Field Operations')
+          organization_name: getSetting('organization_name', 'JKLFDP - J&K, Leh and Ladakh')
         },
         stats: {
           total_records: records.length,
@@ -1054,7 +1054,7 @@ if (require.main === module) {
   const httpServer = http.createServer(handleRequest);
   httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
     console.log(`\n============================================================`);
-    console.log(`📋 NGO Field Attendance Server Running!`);
+    console.log(`📋 JKLFDP Daily Attendance Server Running!`);
     console.log(`• Desktop (Local):  http://localhost:${HTTP_PORT}`);
     console.log(`• Phone (HTTP):     http://${localIp}:${HTTP_PORT}`);
     console.log(`============================================================`);
