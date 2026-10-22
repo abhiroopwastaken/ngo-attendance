@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Project Manager Portal | JKLFDP Attendance System</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20width=%22100%22%20height=%22100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">Daily Attendance</h1>
+        <p class="brand-sub">JKLFDP - J&K, Leh and Ladakh</p>
+      </div>
+    </div>
+
+    <div class="admin-header-actions">
+      <span class="admin-header-badge">🛡️ ADMIN PORTAL</span>
+      <div class="live-clock" id="headerClock"></div>
+      <button type="button" class="btn btn-sm btn-outline-danger" id="btnAdminSignOut" style="display:none;" onclick="adminSignOut()">
+        🔒 Sign Out
+      </button>
+    </div>
+  </header>
+
+  <!-- Main View -->
+  <main class="main-content">
+    
+    <!-- 1. Manager Login Section (Default when unauthenticated) -->
+    <section id="adminLoginSection" class="admin-login-wrap">
+      <div class="card admin-login-card">
+        <div class="admin-login-icon">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+        </div>
+
+        <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin-bottom: 6px;">Project Manager Sign In</h2>
+        <p class="modal-desc" style="text-align: center; margin-bottom: 20px;">
+          Access all field worker punches, Google Sheet synchronization, CSV exports, and system settings.
+        </p>
+
+        <div id="adminLoginError" class="admin-error-box" style="display:none;"></div>
+
+        <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
+          <div class="form-group" style="text-align: left;">
+            <label class="form-label" for="adminPasswordInput">Manager Password</label>
+            <div class="password-input-group">
+              <input type="password" id="adminPasswordInput" class="form-input" placeholder="Enter password (default: JKLFDP@2026)" required autocomplete="current-password">
+              <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('adminPasswordInput')" title="Show/Hide Password" aria-label="Toggle password visibility">
+                👁️
+              </button>
+            </div>
+          </div>
+
+          <div class="admin-remember-row">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input type="checkbox" id="adminRememberMe" checked>
+              <span>Remember me on this device (30 days)</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" id="btnAdminSignIn" style="padding: 12px; font-size: 0.95rem; font-weight: 700;">
+            Sign In to Admin Portal
+          </button>
+        </form>
+
+        <div style="margin-top: 20px;">
+          <a href="/" class="admin-back-link">
+            ← Return to Field Worker Attendance
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Manager Full Dashboard Section (Shown when authenticated) -->
+    <section id="adminDashboardSection" class="admin-main-view" style="display:none;">
+      
+      <!-- Top Manager Controls & Overview -->
+      <div class="card manager-controls-card">
+        <div class="manager-dash-title" style="margin-bottom: 14px;">
+          <div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">Field Attendance Master Dashboard</h3>
+            <p class="manager-dash-sub">Overseeing all JKLFDP field workers and synchronization</p>
+          </div>
+        </div>
+
+        <div class="manager-stats-grid">
+          <div class="manager-stat-box">
+            <span class="manager-stat-num" id="statTotalPunches">0</span>
+            <span class="manager-stat-label">Total Punches</span>
+          </div>
+          <div class="manager-stat-box">
+            <span class="manager-stat-num stat-green" id="statCheckIns">0</span>
+            <span class="manager-stat-label">Check-Ins</span>
+          </div>
+          <div class="manager-stat-box">
+            <span class="manager-stat-num stat-orange" id="statCheckOuts">0</span>
+            <span class="manager-stat-label">Check-Outs</span>
+          </div>
+          <div class="manager-stat-box">
+            <span class="manager-stat-num" id="managerUnsyncedCount" style="color: #2563eb;">0</span>
+            <span class="manager-stat-label">Pending Sync</span>
+          </div>
+        </div>
+
+        <!-- Master Action Buttons -->
+        <div class="manager-actions-row">
+          <a id="btnManagerExportCsv" href="/api/export.csv" class="btn btn-success" download>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download Full CSV Report
+          </a>
+
+          <button type="button" class="btn btn-primary" id="btnSyncNow" onclick="syncPendingRecords()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            Sync to Google Sheet (<span id="btnSyncPendingCount">0</span> pending)
+          </button>
+
+          <button type="button" class="btn btn-outline" onclick="openSheetConfigModal()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Sheet Settings
+          </button>
+
+          <button type="button" class="btn btn-outline" onclick="openChangePasswordModal()">
+            🔑 Change Password
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter & Search Controls -->
+      <div class="manager-filter-bar">
+        <div class="records-filter-pills">
+          <button type="button" class="filter-pill active" id="pillManagerFilterAll" onclick="setManagerFilter('ALL')">
+            All Workers (<span id="countManagerAll">0</span>)
+          </button>
+          <button type="button" class="filter-pill" id="pillManagerFilterCheckIn" onclick="setManagerFilter('CHECK-IN')">
+            🟢 Check-Ins (<span id="countManagerCheckIn">0</span>)
+          </button>
+          <button type="button" class="filter-pill" id="pillManagerFilterCheckOut" onclick="setManagerFilter('CHECK-OUT')">
+            🔴 Check-Outs (<span id="countManagerCheckOut">0</span>)
+          </button>
+        </div>
+
+        <div class="search-bar-wrap" style="margin-top: 10px;">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="managerSearchInput" class="search-input" placeholder="Search any worker name, ID, site, purpose, or supervisor..." oninput="filterManagerRecords(this.value)">
+        </div>
+      </div>
+
+      <!-- Full Attendance Feed List -->
+      <div id="managerRecordsList" class="records-container" style="margin-top: 14px;">
+        <!-- Injected dynamically -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Change Manager Password Modal -->
+  <div class="modal-backdrop" id="changePasswordModal" style="display:none;" onclick="handleModalBackdropClick(event)">
+    <div class="modal-sheet modal-pin-box" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔑 Change Manager Password</h3>
+        <button type="button" class="btn-icon" onclick="closeChangePasswordModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div id="changePasswordError" class="admin-error-box" style="display:none;"></div>
+
+        <form onsubmit="submitChangePassword(event)">
+          <div class="form-group">
+            <label class="form-label" for="inputCurrentPassword">Current Password</label>
+            <div class="password-input-group">
+              <input type="password" id="inputCurrentPassword" class="form-input" required placeholder="Enter current password">
+              <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('inputCurrentPassword')" title="Show/Hide">👁️</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inputNewPassword">New Password (Min 6 characters)</label>
+            <div class="password-input-group">
+              <input type="password" id="inputNewPassword" class="form-input" required minlength="6" placeholder="Enter new password">
+              <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('inputNewPassword')" title="Show/Hide">👁️</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inputConfirmNewPassword">Confirm New Password</label>
+            <div class="password-input-group">
+              <input type="password" id="inputConfirmNewPassword" class="form-input" required minlength="6" placeholder="Confirm new password">
+              <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('inputConfirmNewPassword')" title="Show/Hide">👁️</button>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-outline" onclick="closeChangePasswordModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Update Password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Sheet Configuration Modal -->
+  <div class="modal-backdrop" id="sheetConfigModal" style="display:none;" onclick="handleModalBackdropClick(event)">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h3 class="modal-title">Connect Google Sheet</h3>
+        <button type="button" class="btn-icon" onclick="closeSheetConfigModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Target Sheet Link Banner -->
+        <div style="background: #f1f5f9; padding: 12px 14px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="min-width: 0;">
+            <div style="font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Linked Google Sheet</div>
+            <div style="font-size: 0.8rem; font-weight: 600; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="currentSheetDisplay">
+              https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s
+            </div>
+          </div>
+          <a id="btnOpenGoogleSheet" href="https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit?usp=sharing" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="white-space: nowrap; flex-shrink: 0;">
+            Open Sheet ↗
+          </a>
+        </div>
+
+        <p class="modal-desc" style="margin-bottom: 14px;">
+          Configure your Google Sheet webhook connection. Records are always safely logged into the database and local CSV spreadsheet as well.
+        </p>
+
+        <!-- Form for Google Sheet Settings -->
+        <form id="sheetSettingsForm" onsubmit="saveSheetSettings(event)">
+          <div class="form-group">
+            <label for="googleSheetUrlInput" class="form-label">Google Sheet URL</label>
+            <input type="url" id="googleSheetUrlInput" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit?usp=sharing" oninput="updateSheetOpenLink()">
+          </div>
+
+          <div style="margin: 16px 0; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+            <h4 style="font-size: 0.9rem; font-weight: 700; color: #1e293b; margin-bottom: 6px;">
+              Option 1: Google Apps Script Webhook (Recommended)
+            </h4>
+            <p style="font-size: 0.78rem; color: #475569; margin-bottom: 10px;">
+              Fastest setup directly from your Google Sheet.
+            </p>
+
+            <div class="form-group">
+              <label for="googleWebhookInput" class="form-label">Apps Script Webhook URL</label>
+              <input type="url" id="googleWebhookInput" class="form-input" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+
+            <div class="btn-group" style="margin-bottom: 12px;">
+              <button type="button" class="btn btn-outline" onclick="testSheetWebhook()">
+                Test Webhook Connection
+              </button>
+              <button type="submit" class="btn btn-primary">
+                Save Settings
+              </button>
+            </div>
+          </div>
+
+          <!-- Troubleshooting & Quick Guide -->
+          <details class="setup-guide" open>
+            <summary class="setup-summary">
+              <span>⚠️ Why Webhooks fail & 30-Second Fix</span>
+            </summary>
+            <div class="setup-content">
+              <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.78rem; color: #991b1b;">
+                <strong>Why webhooks return an error:</strong>
+                <ul style="margin: 4px 0 0 16px; padding: 0;">
+                  <li><strong>Who has access:</strong> Google defaults to <em>"Only myself"</em>. This blocks incoming pings. It <strong>MUST be set to "Anyone"</strong>.</li>
+                  <li><strong>New Version required:</strong> Saving the script does NOT update the web app URL. You must click <strong>Deploy → Manage deployments → Edit (Pencil) → Version: New version → Deploy</strong>.</li>
+                </ul>
+              </div>
+
+              <ol class="setup-steps">
+                <li>Open your sheet: <a href="https://docs.google.com/spreadsheets/d/126zQm54eFZyDvKWlUvi1efvorLNP5l_cfibAiespP6s/edit" target="_blank" rel="noopener"><strong>Click here to open Google Sheet</strong></a>.</li>
+                <li>In the top menu, click <strong>Extensions</strong> → <strong>Apps Script</strong>.</li>
+                <li>Delete everything in <code>Code.gs</code> and paste the exact script below:</li>
+              </ol>
+
+              <div class="code-box">
+                <button type="button" class="btn-copy" onclick="copyAppsScriptCode()">Copy Script</button>
+                <pre><code id="appsScriptSnippet">function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: "active", message: "Attendance webhook is online and ready!" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getActiveSheet();
+    
+    // Auto-create headers if sheet is empty
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow([
+        "Record ID", "Timestamp", "Date & Time", "Punch Type", "Worker Name", 
+        "Worker ID", "Purpose / Activity", "Site / Location", "Readable Address", 
+        "Supervisor Name", "Supervisor Contact", "Latitude", "Longitude", 
+        "Accuracy (m)", "Google Maps Link", "Photo URL", "Notes"
+      ]);
+      sheet.getRange(1, 1, 1, 17).setFontWeight("bold").setBackground("#e2e8f0");
+    }
+    
+    var data = JSON.parse(e.postData.contents);
+    sheet.appendRow([
+      data.id,
+      data.timestamp,
+      data.formatted_time,
+      data.entry_type || "CHECK-IN",
+      data.worker_name,
+      data.worker_id,
+      data.purpose,
+      data.site_name,
+      data.address || "",
+      data.supervisor_name,
+      data.supervisor_contact || "",
+      data.latitude || "",
+      data.longitude || "",
+      data.accuracy || "",
+      data.maps_url || "",
+      data.photo_url || "",
+      data.notes || ""
+    ]);
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "ok" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}</code></pre>
+              </div>
+
+              <ol class="setup-steps" start="4">
+                <li>Click the 💾 <strong>Save Project</strong> icon (or press <code>Cmd + S</code> / <code>Ctrl + S</code>).</li>
+                <li>Click <strong>Deploy</strong> → <strong>Manage deployments</strong> → click the <strong>✏️ Edit (Pencil)</strong> icon → under <em>Version</em>, select <strong>New version</strong> → click <strong>Deploy</strong>.</li>
+                <li>Copy the resulting Web App URL, paste it above, and click <strong>Test Webhook Connection</strong>!</li>
+              </ol>
+            </div>
+          </details>
+
+          <!-- Option 2: Service Account (Direct Google API) -->
+          <details class="setup-guide" style="margin-top: 14px;">
+            <summary class="setup-summary">
+              <span>Option 2: Direct Google Cloud Service Account (No Webhooks)</span>
+            </summary>
+            <div class="setup-content">
+              <p style="font-size: 0.78rem; color: #475569; margin-bottom: 8px;">
+                If you have a Google Cloud Service Account JSON key (e.g. <code>credentials.json</code>), paste it here or drop it into the app directory.
+                Then share your sheet with the service account email as <strong>Editor</strong>. The server will use Google Sheets API v4 directly!
+              </p>
+              <div class="form-group">
+                <label for="serviceAccountJsonInput" class="form-label">Service Account JSON</label>
+                <textarea id="serviceAccountJsonInput" class="form-input" rows="3" placeholder='{"type": "service_account", "client_email": "...", "private_key": "..."}' style="font-family: monospace; font-size: 0.72rem;"></textarea>
+              </div>
+              <div class="btn-group">
+                <button type="button" class="btn btn-outline" onclick="testServiceAccountConnection()">
+                  Test Direct API Connection
+                </button>
+              </div>
+            </div>
+          </details>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Full Preview Modal -->
+  <div class="modal-backdrop" id="photoModal" style="display:none;" onclick="closePhotoModal()">
+    <div class="photo-modal-content">
+      <img id="fullPhotoImg" src="" alt="Full attendance photo">
+      <div class="photo-modal-meta" id="photoModalMeta"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

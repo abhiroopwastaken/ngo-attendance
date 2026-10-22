@@ -233,16 +233,32 @@ try {
   };
 }
 
-function getManagerPin() {
-  return getSetting('manager_pin', '2026');
+function getManagerPassword() {
+  const envPass = process.env.MANAGER_PASSWORD || process.env.MANAGER_PIN;
+  if (envPass) return envPass.trim();
+  const dbPass = getSetting('manager_password');
+  if (dbPass) return dbPass.trim();
+  const legacyPin = getSetting('manager_pin');
+  if (legacyPin && legacyPin !== '2026' && legacyPin !== '1234') {
+    return legacyPin.trim();
+  }
+  return 'JKLFDP@2026';
+}
+
+function computeManagerToken(password) {
+  return crypto.createHash('sha256').update(String(password || '').trim() + ':jklfdp_auth_salt_2026').digest('hex');
 }
 
 function verifyManagerPin(req, parsedUrl) {
-  const pinHeader = req.headers['x-manager-pin'];
-  const pinQuery = parsedUrl ? parsedUrl.searchParams.get('pin') : null;
-  const provided = String(pinHeader || pinQuery || '').trim();
-  const actual = String(getManagerPin()).trim();
-  return provided && provided === actual;
+  const actualPassword = String(getManagerPassword()).trim();
+  const validToken = computeManagerToken(actualPassword);
+
+  const authHeader = req.headers['x-manager-password'] || req.headers['x-manager-token'] || req.headers['x-manager-pin'];
+  const authQuery = parsedUrl ? (parsedUrl.searchParams.get('token') || parsedUrl.searchParams.get('password') || parsedUrl.searchParams.get('pin')) : null;
+  const provided = String(authHeader || authQuery || '').trim();
+
+  if (!provided) return false;
+  return provided === actualPassword || provided === validToken;
 }
 
 // CSV Management
@@ -819,35 +835,47 @@ async function handleRequest(req, res) {
       }, 201);
     }
 
-    // API: POST /api/verify-manager-pin
-    if (req.method === 'POST' && pathname === '/api/verify-manager-pin') {
+    // API: POST /api/verify-manager-password (also aliases /api/verify-manager-pin)
+    if (req.method === 'POST' && (pathname === '/api/verify-manager-password' || pathname === '/api/verify-manager-pin')) {
       const rawBody = await readBody();
       const data = JSON.parse(rawBody || '{}');
-      const pin = String(data.pin || '').trim();
-      if (!pin) {
-        return sendJson({ success: false, error: 'PIN is required' }, 400);
+      const pass = String(data.password || data.token || data.pin || '').trim();
+      if (!pass) {
+        return sendJson({ success: false, error: 'Password or PIN is required' }, 400);
       }
-      if (pin === getManagerPin()) {
-        return sendJson({ success: true, message: 'Manager PIN verified' });
+      const actual = String(getManagerPassword()).trim();
+      const token = computeManagerToken(actual);
+      if (pass === actual || pass === token) {
+        return sendJson({
+          success: true,
+          message: 'Manager authenticated successfully',
+          token: token,
+          expires_in_days: 30
+        });
       }
-      return sendJson({ success: false, error: 'Incorrect Manager PIN' }, 401);
+      return sendJson({ success: false, error: 'Incorrect Manager Password' }, 401);
     }
 
-    // API: POST /api/change-manager-pin
-    if (req.method === 'POST' && pathname === '/api/change-manager-pin') {
+    // API: POST /api/change-manager-password (also aliases /api/change-manager-pin)
+    if (req.method === 'POST' && (pathname === '/api/change-manager-password' || pathname === '/api/change-manager-pin')) {
       const rawBody = await readBody();
       const data = JSON.parse(rawBody || '{}');
-      const currentPin = String(data.current_pin || '').trim();
-      const newPin = String(data.new_pin || '').trim();
+      const current = String(data.current_password || data.current_pin || '').trim();
+      const nextPass = String(data.new_password || data.new_pin || '').trim();
 
-      if (currentPin !== getManagerPin()) {
-        return sendJson({ success: false, error: 'Current Manager PIN is incorrect' }, 401);
+      const actual = String(getManagerPassword()).trim();
+      const token = computeManagerToken(actual);
+
+      if (current !== actual && current !== token) {
+        return sendJson({ success: false, error: 'Current Manager Password is incorrect' }, 401);
       }
-      if (!newPin || newPin.length < 4) {
-        return sendJson({ success: false, error: 'New PIN must be at least 4 digits' }, 400);
+      if (!nextPass || nextPass.length < 4) {
+        return sendJson({ success: false, error: 'New password must be at least 4 characters' }, 400);
       }
-      setSetting('manager_pin', newPin);
-      return sendJson({ success: true, message: 'Manager PIN updated successfully' });
+      setSetting('manager_password', nextPass);
+      setSetting('manager_pin', nextPass);
+      const newToken = computeManagerToken(nextPass);
+      return sendJson({ success: true, message: 'Manager Password updated successfully', token: newToken });
     }
 
     // API: GET /api/export.csv (Manager Only)
@@ -1021,6 +1049,15 @@ async function handleRequest(req, res) {
 
     // Static files
     if (req.method === 'GET') {
+      if (pathname === '/admin' || pathname === '/admin/') {
+        const adminPath = path.join(PUBLIC_DIR, 'admin.html');
+        if (fs.existsSync(adminPath)) {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          fs.createReadStream(adminPath).pipe(res);
+          return;
+        }
+      }
+
       let relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '');
       const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
       const filePath = path.join(PUBLIC_DIR, safePath);
