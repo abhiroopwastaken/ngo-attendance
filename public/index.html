@@ -322,6 +322,12 @@
           <div id="photo-live-state" class="hidden space-y-2.5">
             <div class="relative rounded-xl overflow-hidden bg-ink-900 aspect-[16/10]">
               <video id="camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+
+              <!-- Floating Switch Camera Button -->
+              <button type="button" onclick="switchCameraFacing()" title="Switch Front/Back Camera" class="absolute top-2.5 right-2.5 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-xs text-white flex items-center justify-center transition active:scale-95 shadow-md">
+                <i data-lucide="switch-camera" class="w-4 h-4"></i>
+              </button>
+
               <div class="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-[10px] font-mono text-white/90 bg-black/50 backdrop-blur-xs px-2.5 py-1 rounded-md">
                 <span id="live-camera-telemetry">GPS Active</span>
                 <span class="text-botanical-500 flex items-center gap-1">
@@ -334,6 +340,10 @@
               <button type="button" onclick="snapFromLiveVideo()" class="flex-1 py-2 px-3 rounded-xl bg-ink-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.99] transition">
                 <i data-lucide="aperture" class="w-3.5 h-3.5"></i>
                 <span>Capture Photo</span>
+              </button>
+              <button type="button" onclick="switchCameraFacing()" title="Flip Camera" class="py-2 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-ink-900 text-xs font-medium flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="switch-camera" class="w-3.5 h-3.5"></i>
+                <span id="camera-facing-label">Front</span>
               </button>
               <button type="button" onclick="stopLiveCamera()" class="py-2 px-3 rounded-xl bg-gray-100 text-ink-600 hover:text-ink-900 text-xs font-medium transition">
                 Cancel

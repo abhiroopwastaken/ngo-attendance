@@ -17,6 +17,7 @@ const appState = {
   mediaStream: null,
   workerRecords: [],
   historyFilter: 'ALL', // 'ALL' | 'CHECK-IN' | 'CHECK-OUT'
+  cameraFacing: 'environment', // 'environment' (back) | 'user' (front)
   siteNameManuallyEdited: false,
   isSubmitting: false
 };
@@ -473,28 +474,64 @@ function handlePhotoSurfaceClick() {
   startLiveCamera();
 }
 
+function switchCameraFacing() {
+  appState.cameraFacing = appState.cameraFacing === 'environment' ? 'user' : 'environment';
+  const label = document.getElementById('camera-facing-label');
+  if (label) {
+    label.textContent = appState.cameraFacing === 'user' ? 'Back' : 'Front';
+  }
+  startLiveCamera();
+}
+
 async function startLiveCamera() {
+  if (appState.mediaStream) {
+    appState.mediaStream.getTracks().forEach(t => t.stop());
+    appState.mediaStream = null;
+  }
+
   const video = document.getElementById('camera-video');
   const emptyState = document.getElementById('photo-empty-state');
   const liveState = document.getElementById('photo-live-state');
   const previewState = document.getElementById('photo-preview-state');
+  const label = document.getElementById('camera-facing-label');
+  if (label) {
+    label.textContent = appState.cameraFacing === 'user' ? 'Back' : 'Front';
+  }
 
   try {
     let stream = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: { ideal: appState.cameraFacing },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false
       });
     } catch (e) {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: appState.cameraFacing },
+          audio: false
+        });
+      } catch (e2) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
     }
 
     appState.mediaStream = stream;
     video.srcObject = stream;
+
+    // In selfie mode, mirror video horizontally for natural viewing
+    if (appState.cameraFacing === 'user') {
+      video.style.transform = 'scaleX(-1)';
+    } else {
+      video.style.transform = 'none';
+    }
 
     emptyState.classList.add('hidden');
     previewState.classList.add('hidden');
@@ -502,14 +539,15 @@ async function startLiveCamera() {
 
     const telem = document.getElementById('live-camera-telemetry');
     if (telem) {
-      telem.textContent = `${appState.lat}, ${appState.lng} (±${appState.gpsAccuracy}m)`;
+      const modeStr = appState.cameraFacing === 'user' ? 'Front Camera' : 'Back Camera';
+      telem.textContent = `${appState.lat}, ${appState.lng} • ${modeStr}`;
     }
 
     if (window.lucide) lucide.createIcons();
   } catch (err) {
     console.warn('Camera stream failed, using simulated capture:', err);
     captureSimulatedFieldPhoto();
-    showToast('Simulated verification photo captured', false);
+    showToast('Simulated verification photo captured');
   }
 }
 
@@ -518,6 +556,9 @@ function stopLiveCamera() {
     appState.mediaStream.getTracks().forEach(t => t.stop());
     appState.mediaStream = null;
   }
+  const video = document.getElementById('camera-video');
+  if (video) video.style.transform = 'none';
+
   const liveState = document.getElementById('photo-live-state');
   if (liveState) liveState.classList.add('hidden');
 
@@ -533,7 +574,14 @@ function snapFromLiveVideo() {
   if (!video || !canvas) return;
 
   const ctx = canvas.getContext('2d');
+  ctx.save();
+  // If selfie/front camera, mirror onto canvas to match what user saw on screen
+  if (appState.cameraFacing === 'user') {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.restore();
 
   stopLiveCamera();
   stampMinimalWatermark(canvas);
