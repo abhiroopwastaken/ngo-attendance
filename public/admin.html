@@ -317,22 +317,75 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getActiveSheet();
     
-    // Auto-create headers if sheet is empty
+    // Auto-create headers if sheet is empty (18 columns with separate Date and Time)
     if (sheet.getLastRow() === 0) {
       sheet.appendRow([
-        "Record ID", "Timestamp", "Date & Time", "Punch Type", "Worker Name", 
+        "Record ID", "Timestamp", "Date", "Time", "Punch Type", "Worker Name", 
         "Worker ID", "Purpose / Activity", "Site / Location", "Readable Address", 
         "Supervisor Name", "Supervisor Contact", "Latitude", "Longitude", 
         "Accuracy (m)", "Google Maps Link", "Photo URL", "Notes"
       ]);
-      sheet.getRange(1, 1, 1, 17).setFontWeight("bold").setBackground("#e2e8f0");
+      sheet.getRange(1, 1, 1, 18).setFontWeight("bold").setBackground("#e2e8f0");
+    } else {
+      // Auto-migrate if old 1-column "Date & Time" header exists
+      var firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 18)).getValues()[0];
+      if (firstRow[2] === "Date & Time" || firstRow[2] === "Date & Time (IST)") {
+        sheet.insertColumnAfter(3);
+        sheet.getRange(1, 3).setValue("Date");
+        sheet.getRange(1, 4).setValue("Time");
+        if (firstRow[3] === "CHECK-IN" || firstRow[3] === "") {
+          sheet.getRange(1, 5).setValue("Punch Type");
+        }
+        sheet.getRange(1, 1, 1, 18).setFontWeight("bold").setBackground("#e2e8f0");
+        
+        var numRows = sheet.getLastRow();
+        if (numRows > 1) {
+          var oldVals = sheet.getRange(2, 3, numRows - 1, 1).getValues();
+          var newDates = [];
+          var newTimes = [];
+          for (var i = 0; i < oldVals.length; i++) {
+            var val = String(oldVals[i][0] || "").trim();
+            var parts = val.split(", ");
+            if (parts.length >= 3) {
+              newDates.push([parts[0] + ", " + parts[1]]);
+              newTimes.push([parts.slice(2).join(", ")]);
+            } else if (parts.length === 2 && parts[1].indexOf(":") !== -1) {
+              newDates.push([parts[0]]);
+              newTimes.push([parts[1]]);
+            } else {
+              newDates.push([val]);
+              newTimes.push([""]);
+            }
+          }
+          sheet.getRange(2, 3, numRows - 1, 1).setValues(newDates);
+          sheet.getRange(2, 4, numRows - 1, 1).setValues(newTimes);
+        }
+      }
     }
     
     var data = JSON.parse(e.postData.contents);
+    
+    // Resolve separate Date and Time
+    var dateVal = data.date || "";
+    var timeVal = data.time || "";
+    if (!dateVal && data.formatted_time) {
+      var parts = String(data.formatted_time).split(", ");
+      if (parts.length >= 3) {
+        dateVal = parts[0] + ", " + parts[1];
+        timeVal = parts.slice(2).join(", ");
+      } else if (parts.length === 2 && parts[1].indexOf(":") !== -1) {
+        dateVal = parts[0];
+        timeVal = parts[1];
+      } else {
+        dateVal = data.formatted_time;
+      }
+    }
+    
     sheet.appendRow([
       data.id,
       data.timestamp,
-      data.formatted_time,
+      dateVal,
+      timeVal,
       data.entry_type || "CHECK-IN",
       data.worker_name,
       data.worker_id,
@@ -356,6 +409,48 @@ function doPost(e) {
     return ContentService
       .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Optional helper: Run directly in Apps Script to split existing rows immediately
+function fixExistingDateAndTime() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var firstRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 18)).getValues()[0];
+  if (firstRow[2] === "Date & Time" || firstRow[2] === "Date & Time (IST)") {
+    sheet.insertColumnAfter(3);
+    sheet.getRange(1, 3).setValue("Date");
+    sheet.getRange(1, 4).setValue("Time");
+    if (firstRow[3] === "CHECK-IN" || firstRow[3] === "") {
+      sheet.getRange(1, 5).setValue("Punch Type");
+    }
+    sheet.getRange(1, 1, 1, 18).setFontWeight("bold").setBackground("#e2e8f0");
+    
+    var numRows = sheet.getLastRow();
+    if (numRows > 1) {
+      var oldVals = sheet.getRange(2, 3, numRows - 1, 1).getValues();
+      var newDates = [];
+      var newTimes = [];
+      for (var i = 0; i < oldVals.length; i++) {
+        var val = String(oldVals[i][0] || "").trim();
+        var parts = val.split(", ");
+        if (parts.length >= 3) {
+          newDates.push([parts[0] + ", " + parts[1]]);
+          newTimes.push([parts.slice(2).join(", ")]);
+        } else if (parts.length === 2 && parts[1].indexOf(":") !== -1) {
+          newDates.push([parts[0]]);
+          newTimes.push([parts[1]]);
+        } else {
+          newDates.push([val]);
+          newTimes.push([""]);
+        }
+      }
+      sheet.getRange(2, 3, numRows - 1, 1).setValues(newDates);
+      sheet.getRange(2, 4, numRows - 1, 1).setValues(newTimes);
+    }
+    SpreadsheetApp.getUi().alert("Done! Split into separate Date and Time columns.");
+  } else {
+    SpreadsheetApp.getUi().alert("Date and Time columns are already separated!");
   }
 }</code></pre>
               </div>

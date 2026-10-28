@@ -261,11 +261,53 @@ function verifyManagerPin(req, parsedUrl) {
   return provided === actualPassword || provided === validToken;
 }
 
+function extractDateAndTime(record, timeZone) {
+  const tz = timeZone || 'Asia/Kolkata';
+  let dateStr = '';
+  let timeStr = '';
+
+  if (record.created_at) {
+    const d = new Date(record.created_at);
+    if (!isNaN(d.getTime())) {
+      dateStr = d.toLocaleDateString('en-US', {
+        timeZone: tz,
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      timeStr = d.toLocaleTimeString('en-US', {
+        timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+  }
+
+  if (!dateStr && record.formatted_time) {
+    const parts = String(record.formatted_time).split(', ');
+    if (parts.length >= 3) {
+      dateStr = `${parts[0]}, ${parts[1]}`;
+      timeStr = parts.slice(2).join(', ');
+    } else if (parts.length === 2 && parts[1].includes(':')) {
+      dateStr = parts[0];
+      timeStr = parts[1];
+    } else {
+      dateStr = record.formatted_time;
+      timeStr = '';
+    }
+  }
+
+  return { date: dateStr, time: timeStr };
+}
+
 // CSV Management
 const CSV_HEADERS = [
   'Record ID',
   'Timestamp (ISO)',
-  'Date & Time',
+  'Date',
+  'Time',
   'Punch Type',
   'Field Worker Name',
   'Worker ID / Phone',
@@ -297,7 +339,7 @@ function initCsvIfMissing() {
   } else {
     try {
       const firstLine = fs.readFileSync(CSV_PATH, 'utf8').split('\n')[0];
-      if (!firstLine.includes('Readable Address')) {
+      if (!firstLine.includes('"Date"') || !firstLine.includes('"Time"')) {
         regenerateFullCsv(`http://${localIp}:${HTTP_PORT}`);
       }
     } catch (e) {}
@@ -306,11 +348,13 @@ function initCsvIfMissing() {
 
 function appendToCsv(record, baseUrl) {
   initCsvIfMissing();
+  const { date, time } = extractDateAndTime(record);
   const photoUrl = record.photo_filename ? `${baseUrl}/uploads/${record.photo_filename}` : '';
   const row = [
     record.id,
     record.created_at,
-    record.formatted_time,
+    date,
+    time,
     record.entry_type || 'CHECK-IN',
     record.worker_name,
     record.worker_id,
@@ -336,11 +380,13 @@ function regenerateFullCsv(baseUrl) {
   const bom = '\uFEFF';
   const headerRow = CSV_HEADERS.map(escapeCsvField).join(',') + '\n';
   const rows = records.map(record => {
+    const { date, time } = extractDateAndTime(record);
     const photoUrl = record.photo_filename ? `${baseUrl}/uploads/${record.photo_filename}` : '';
     return [
       record.id,
       record.created_at,
-      record.formatted_time,
+      date,
+      time,
       record.entry_type || 'CHECK-IN',
       record.worker_name,
       record.worker_id,
@@ -460,10 +506,12 @@ function safeSheetsText(str) {
 async function sendDirectToGoogleSheetApi(spreadsheetId, record, baseUrl, credentials) {
   const token = await getServiceAccountAccessToken(credentials);
   const photoUrl = record.photo_filename ? `${baseUrl}/uploads/${record.photo_filename}` : '';
+  const { date, time } = extractDateAndTime(record);
   const rowValues = [
     record.id,
     record.created_at,
-    record.formatted_time,
+    date,
+    time,
     record.entry_type || 'CHECK-IN',
     record.worker_name,
     safeSheetsText(record.worker_id),
@@ -503,11 +551,14 @@ async function sendToGoogleSheetWebhook(webhookUrl, record, baseUrl) {
     return { success: false, error: 'No valid webhook URL configured' };
   }
 
+  const { date, time } = extractDateAndTime(record);
   const payload = {
     id: record.id,
     entry_type: record.entry_type || 'CHECK-IN',
     timestamp: record.created_at,
-    formatted_time: record.formatted_time,
+    date: date,
+    time: time,
+    formatted_time: record.formatted_time || (date ? `${date}, ${time}` : ''),
     worker_name: record.worker_name,
     worker_id: safeSheetsText(record.worker_id),
     purpose: record.purpose,
@@ -995,11 +1046,11 @@ async function handleRequest(req, res) {
         address: 'Test Location Address',
         supervisor_name: 'Field Director',
         supervisor_contact: 'director@ngo.org',
-        notes: 'Test ping from NGO Attendance Web App',
-        latitude: 28.6139,
-        longitude: 77.2090,
-        accuracy: 5.0,
-        maps_url: 'https://www.google.com/maps?q=28.6139,77.2090',
+        notes: 'Test ping from JKLFDP Attendance System',
+        latitude: 33.9424,
+        longitude: 74.7981,
+        accuracy: 10.0,
+        maps_url: 'https://www.google.com/maps?q=33.9424,74.7981',
         photo_filename: null
       };
 
