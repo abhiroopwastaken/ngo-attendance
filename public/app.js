@@ -737,7 +737,7 @@ function clearPurposeInput() {
 }
 
 // =========================================================================
-// Readiness State & Demo Auto-Fill
+// Readiness State
 // =========================================================================
 
 function updateReadinessState() {
@@ -745,7 +745,6 @@ function updateReadinessState() {
   const locInput = document.getElementById('location-name');
   const clearBtn = document.getElementById('clear-purpose-btn');
   const helperText = document.getElementById('readiness-helper-text');
-  const quickFillBtn = document.getElementById('quick-fill-btn');
 
   const purpose = purposeInput ? purposeInput.value.trim() : '';
   const loc = locInput ? locInput.value.trim() : '';
@@ -764,58 +763,22 @@ function updateReadinessState() {
       <span class="w-1.5 h-1.5 rounded-full bg-botanical-600"></span>
       <span class="text-botanical-700 font-medium">Ready to punch ${modeLabel}</span>
     `;
-    if (quickFillBtn) quickFillBtn.classList.add('hidden');
   } else if (!appState.photoCaptured && !purpose) {
     helperText.innerHTML = `
       <span class="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
       <span>Photo &amp; purpose required</span>
     `;
-    if (quickFillBtn) quickFillBtn.classList.remove('hidden');
   } else if (!appState.photoCaptured) {
     helperText.innerHTML = `
       <span class="w-1.5 h-1.5 rounded-full bg-terracotta-600"></span>
       <span>Capture verification photo above</span>
     `;
-    if (quickFillBtn) quickFillBtn.classList.remove('hidden');
   } else {
     helperText.innerHTML = `
       <span class="w-1.5 h-1.5 rounded-full bg-terracotta-600"></span>
       <span>Enter or select visit purpose</span>
     `;
-    if (quickFillBtn) quickFillBtn.classList.remove('hidden');
   }
-}
-
-function fillDemoState() {
-  const nameInput = document.getElementById('worker-name');
-  const idInput = document.getElementById('worker-id');
-  const supInput = document.getElementById('supervisor-name');
-  const notesInput = document.getElementById('field-notes');
-  const locInput = document.getElementById('location-name');
-
-  if (nameInput && !nameInput.value.trim()) nameInput.value = 'Abhiroop Agarwal';
-  if (idInput && !idInput.value.trim()) idInput.value = '9719003001';
-  if (supInput && !supInput.value.trim()) supInput.value = 'Firdous';
-  if (locInput && !locInput.value.trim()) locInput.value = 'Chadoora';
-
-  syncProfileSummary();
-
-  if (!appState.photoCaptured) {
-    captureSimulatedFieldPhoto();
-  }
-
-  const chips = document.querySelectorAll('.purpose-chip');
-  if (chips.length > 1) {
-    selectPurposeChip(chips[1], 'Relief Distribution');
-  }
-
-  if (notesInput && !notesInput.value.trim()) {
-    notesInput.value = 'Distributed 45 ration kits; surveyed 12 families';
-    autoResizeTextarea(notesInput);
-  }
-
-  updateReadinessState();
-  showToast('Demo fields populated', false);
 }
 
 // =========================================================================
@@ -837,13 +800,13 @@ async function handlePunchSubmit() {
   if (!workerName || !workerId || !supName) {
     if (!appState.profileExpanded) toggleProfileAccordion();
     highlightCard('profile-card');
-    showToast('Complete worker & supervisor info', true);
+    showToast('Complete worker & supervisor info');
     return;
   }
 
   if (!appState.photoCaptured || !appState.photoDataUrl) {
     highlightCard('photo-card');
-    showToast('Verification photo is required', true);
+    showToast('Verification photo is required');
     return;
   }
 
@@ -851,7 +814,7 @@ async function handlePunchSubmit() {
     highlightCard('visit-card');
     const pInput = document.getElementById('visit-purpose');
     if (pInput) pInput.focus();
-    showToast('Please specify purpose of visit', true);
+    showToast('Please specify purpose of visit');
     return;
   }
 
@@ -1136,19 +1099,13 @@ function highlightCard(id) {
 }
 
 let toastTimer = null;
-function showToast(msg, allowAutoFill = false) {
+function showToast(msg) {
   const banner = document.getElementById('toast-banner');
   const msgEl = document.getElementById('toast-message');
-  const actionBtn = document.getElementById('toast-action-btn');
 
   if (!banner || !msgEl) return;
 
   msgEl.textContent = msg;
-
-  if (actionBtn) {
-    if (allowAutoFill) actionBtn.classList.remove('hidden');
-    else actionBtn.classList.add('hidden');
-  }
 
   banner.classList.remove('opacity-0', '-translate-y-2');
   banner.classList.add('opacity-100', 'translate-y-0');

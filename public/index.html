@@ -107,17 +107,6 @@
 </head>
 <body class="min-h-screen flex flex-col items-center justify-start sm:py-6 selection:bg-botanical-100 selection:text-botanical-900">
 
-  <!-- Subtle Desktop Preview Helper (Hidden on mobile devices) -->
-  <div class="hidden sm:flex items-center justify-between w-full max-w-[420px] mb-2.5 px-1 text-xs text-stone-500">
-    <span class="font-medium text-stone-600 flex items-center gap-1.5">
-      <span class="w-1.5 h-1.5 rounded-full bg-botanical-600"></span>
-      Minimalist Redesign
-    </span>
-    <button onclick="fillDemoState()" class="text-stone-600 hover:text-ink-900 font-medium underline underline-offset-4 transition">
-      Auto-fill demo state
-    </button>
-  </div>
-
   <!-- MOBILE APP SHELL -->
   <div id="app-shell" class="w-full max-w-[420px] min-h-screen sm:min-h-[820px] bg-canvas sm:rounded-[34px] sm:shadow-float sm:border sm:border-stone-300/80 flex flex-col justify-between relative overflow-hidden">
 
@@ -357,14 +346,10 @@
             <div class="relative rounded-xl overflow-hidden border border-gray-200 bg-ink-900 aspect-[16/10] cursor-pointer" onclick="openFullPhotoModal()">
               <canvas id="geotag-canvas" width="800" height="500" class="w-full h-full object-cover block"></canvas>
             </div>
-            <div class="flex items-center justify-between pt-0.5">
-              <button type="button" onclick="cycleSimulatedScene()" class="text-xs font-medium text-ink-600 hover:text-ink-900 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-gray-100 transition">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                <span>Change demo scene</span>
-              </button>
-              <button type="button" onclick="resetPhotoCapture()" class="text-xs font-medium text-rose-600 hover:text-rose-700 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-rose-50 transition">
+            <div class="flex items-center justify-end pt-0.5">
+              <button type="button" onclick="resetPhotoCapture()" class="text-xs font-medium text-rose-600 hover:text-rose-700 flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-rose-50 transition">
                 <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                <span>Retake</span>
+                <span>Retake Photo</span>
               </button>
             </div>
           </div>
@@ -482,14 +467,11 @@
 
     <!-- 6. NON-OVERLAPPING STICKY FROSTED BOTTOM BAR -->
     <div id="bottom-action-dock" class="sticky bottom-0 z-30 bg-white/85 backdrop-blur-md border-t border-gray-200/80 px-4 pt-2.5 pb-4">
-      <div class="flex items-center justify-between mb-2 text-[11.5px]">
+      <div class="flex items-center mb-2 text-[11.5px]">
         <span id="readiness-helper-text" class="text-ink-600 flex items-center gap-1.5">
           <span id="readiness-dot" class="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
           <span>Capture photo &amp; select purpose to check in</span>
         </span>
-        <button type="button" id="quick-fill-btn" onclick="fillDemoState()" class="text-botanical-700 font-medium hover:underline">
-          Demo Fill
-        </button>
       </div>
 
       <button type="button" id="punch-submit-btn" onclick="handlePunchSubmit()" class="w-full py-3 px-4 rounded-xl bg-[#065F46] hover:bg-[#047857] active:scale-[0.99] text-white font-semibold text-[14px] tracking-tight shadow-sm flex items-center justify-center gap-2 transition-all">
@@ -500,11 +482,8 @@
 
     <!-- MINIMAL FLOATING TOAST -->
     <div id="toast-banner" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 max-w-[360px] w-[90%] pointer-events-none opacity-0 -translate-y-2 transition-all duration-200">
-      <div class="bg-ink-900 text-white px-3.5 py-2.5 rounded-xl shadow-lg flex items-center justify-between gap-3 text-xs font-medium pointer-events-auto">
+      <div class="bg-ink-900 text-white px-3.5 py-2.5 rounded-xl shadow-lg flex items-center justify-center text-xs font-medium pointer-events-auto">
         <span id="toast-message">Notification</span>
-        <button id="toast-action-btn" onclick="fillDemoState()" class="hidden text-botanical-400 font-semibold hover:underline shrink-0">
-          Auto-fill
-        </button>
       </div>
     </div>
 
