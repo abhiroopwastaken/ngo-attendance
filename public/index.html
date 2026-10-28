@@ -1,434 +1,578 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>JKLFDP Attendance System</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Daily Attendance — JKLFDP</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            canvas: '#F7F7F5',
+            ink: {
+              900: '#111827',
+              600: '#4B5563',
+              400: '#9CA3AF',
+            },
+            botanical: {
+              50: '#ECFDF5',
+              100: '#D1FAE5',
+              400: '#34D399',
+              500: '#10B981',
+              600: '#059669',
+              700: '#047857',
+              900: '#064E3B',
+            },
+            terracotta: {
+              50: '#FFFBEB',
+              100: '#FEF3C7',
+              600: '#D97706',
+              700: '#B45309',
+            }
+          },
+          boxShadow: {
+            'minimal': '0 1px 2px rgba(0, 0, 0, 0.03)',
+            'float': '0 12px 32px -8px rgba(17, 24, 39, 0.08), 0 2px 6px -1px rgba(17, 24, 39, 0.04)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #EBEAE6;
+      color: #111827;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Smooth accordion transition */
+    .collapse-grid {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+      opacity: 0;
+    }
+    .collapse-grid.expanded {
+      grid-template-rows: 1fr;
+      opacity: 1;
+    }
+    .collapse-inner {
+      overflow: hidden;
+    }
+    /* Soft breathing GPS indicator */
+    @keyframes soft-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.92); }
+    }
+    .dot-pulse {
+      animation: soft-pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    /* Subtle error shake */
+    @keyframes minimal-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    .attention-ring {
+      animation: minimal-shake 0.32s ease-in-out;
+      border-color: #D97706 !important;
+      box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12) !important;
+    }
+  </style>
 </head>
-<body>
-  <!-- HTTPS / Phone Permission Warning Banner (Shown only on insecure mobile HTTP) -->
-  <aside id="httpsNoticeBanner" class="https-notice-banner" style="display:none;" aria-live="polite">
-    <div class="https-banner-inner">
-      <div class="https-icon-wrap">🔒</div>
-      <div class="https-text-wrap">
-        <strong class="https-title">Enable Phone Camera & GPS</strong>
-        <p class="https-desc">
-          Mobile browsers (Safari & Chrome) require HTTPS to grant GPS and camera permissions.
-        </p>
+<body class="min-h-screen flex flex-col items-center justify-start sm:py-6 selection:bg-botanical-100 selection:text-botanical-900">
+
+  <!-- Subtle Desktop Preview Helper (Hidden on mobile devices) -->
+  <div class="hidden sm:flex items-center justify-between w-full max-w-[420px] mb-2.5 px-1 text-xs text-stone-500">
+    <span class="font-medium text-stone-600 flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-botanical-600"></span>
+      Minimalist Redesign
+    </span>
+    <button onclick="fillDemoState()" class="text-stone-600 hover:text-ink-900 font-medium underline underline-offset-4 transition">
+      Auto-fill demo state
+    </button>
+  </div>
+
+  <!-- MOBILE APP SHELL -->
+  <div id="app-shell" class="w-full max-w-[420px] min-h-screen sm:min-h-[820px] bg-canvas sm:rounded-[34px] sm:shadow-float sm:border sm:border-stone-300/80 flex flex-col justify-between relative overflow-hidden">
+
+    <!-- Subtle Insecure Warning Banner for Non-Localhost HTTP on Mobile -->
+    <aside id="https-notice-banner" class="hidden w-full bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <span>🔒</span>
+        <span class="truncate">Mobile camera &amp; GPS require HTTPS</span>
       </div>
-      <a id="btnSwitchHttps" href="#" class="btn btn-sm btn-primary https-switch-btn">
-        Switch to HTTPS ↗
+      <a id="btn-switch-https" href="#" class="px-2 py-0.5 rounded bg-amber-600 text-white font-medium text-[11px] hover:bg-amber-700 shrink-0 transition">
+        Switch ↗
       </a>
-    </div>
-  </aside>
+    </aside>
 
-  <!-- Top App Bar -->
-  <header class="app-header">
-    <div class="header-content">
-      <div class="brand">
-        <div class="brand-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-        </div>
-        <div>
-          <h1 class="brand-title">Daily Attendance</h1>
-          <p class="brand-subtitle" id="orgNameSubtitle">JKLFDP - J&K, Leh and Ladakh</p>
-        </div>
-      </div>
-      <div class="header-status">
-        <span class="live-dot"></span>
-        <span id="headerClock">--:--</span>
-
-      </div>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <nav class="tab-nav">
-      <button type="button" class="tab-btn active" id="tabMarkBtn" onclick="switchTab('mark')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-          <circle cx="12" cy="13" r="4"></circle>
-        </svg>
-        Mark Attendance
-      </button>
-      <button type="button" class="tab-btn" id="tabRecordsBtn" onclick="switchTab('records')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-        </svg>
-        My History
-        <span class="badge" id="recordsCountBadge">0</span>
-      </button>
-    </nav>
-  </header>
-
-  <!-- Main Container -->
-  <main class="app-body">
-    <!-- TAB 1: MARK ATTENDANCE -->
-    <section id="sectionMark" class="tab-section active">
-      <form id="attendanceForm" autocomplete="off" onsubmit="handleAttendanceSubmit(event)">
-        
-        <!-- Check-In vs Check-Out Action Selector -->
-        <div class="card punch-mode-card" id="punchModeCard">
-          <div class="punch-mode-header">
-            <span class="punch-mode-title">Attendance Action</span>
-            <span class="current-duty-badge" id="currentDutyBadge">Not Checked In</span>
+    <!-- 1. MINIMAL FROSTED TOP HEADER -->
+    <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200/80">
+      <div class="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-botanical-50 border border-botanical-100 flex items-center justify-center text-botanical-700 shrink-0">
+            <i data-lucide="user-check" class="w-4 h-4 stroke-[2.2]"></i>
           </div>
+          <div class="min-w-0">
+            <h1 class="text-[15px] font-semibold tracking-tight text-ink-900 leading-tight truncate">Daily Attendance</h1>
+            <p class="text-[11px] text-ink-600 truncate">JKLFDP • J&amp;K, Leh and Ladakh</p>
+          </div>
+        </div>
 
-          <div class="punch-type-toggle">
-            <button type="button" class="punch-type-btn active check-in" id="btnSelectCheckIn" onclick="setPunchType('CHECK-IN')">
-              <span class="punch-indicator-dot check-in"></span>
-              <div class="punch-type-labels">
-                <span class="punch-type-title">Check-In</span>
-                <span class="punch-type-sub">Duty Arrival</span>
-              </div>
-            </button>
+        <!-- Minimal Live Clock -->
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100/80 border border-gray-200/60 shrink-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-botanical-600 dot-pulse"></span>
+          <span id="live-header-clock" class="font-mono text-[11px] font-medium text-ink-900 tracking-tight">--:--</span>
+        </div>
+      </div>
 
-            <button type="button" class="punch-type-btn check-out" id="btnSelectCheckOut" onclick="setPunchType('CHECK-OUT')">
-              <span class="punch-indicator-dot check-out"></span>
-              <div class="punch-type-labels">
-                <span class="punch-type-title">Check-Out</span>
-                <span class="punch-type-sub">Duty Departure</span>
-              </div>
-            </button>
+      <!-- Sleek Underline Navigation Switcher -->
+      <div class="px-4 flex items-center gap-6 text-[13px]">
+        <button id="tab-btn-mark" onclick="switchTab('mark')" class="py-2 font-semibold text-ink-900 border-b-2 border-ink-900 transition-colors flex items-center gap-1.5">
+          <span>Mark Attendance</span>
+        </button>
+        <button id="tab-btn-history" onclick="switchTab('history')" class="py-2 font-medium text-ink-600 hover:text-ink-900 border-b-2 border-transparent transition-colors flex items-center gap-1.5">
+          <span>History</span>
+          <span id="history-count-badge" class="px-1.5 py-0.2 rounded-full bg-gray-100 text-ink-600 font-mono text-[11px]">0</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <main id="main-scroll" class="flex-1 overflow-y-auto px-4 pt-3.5 pb-36 space-y-3">
+
+      <!-- ========================================== -->
+      <!-- VIEW 1: MARK ATTENDANCE                    -->
+      <!-- ========================================== -->
+      <div id="view-mark" class="space-y-3">
+
+        <!-- 2. UNIFIED STATUS & GPS STRIP -->
+        <section class="bg-white rounded-2xl border border-[#E5E7EB] shadow-minimal overflow-hidden">
+          <!-- iOS-Style Segmented Mode Switcher -->
+          <div class="p-2">
+            <div class="grid grid-cols-2 p-1 bg-[#F3F4F6] rounded-xl">
+              <button type="button" id="mode-checkin-btn" onclick="setAttendanceMode('check-in')" class="py-1.5 px-3 rounded-lg bg-white text-ink-900 shadow-minimal text-[13px] font-semibold flex items-center justify-center gap-2 transition-all">
+                <span class="w-2 h-2 rounded-full bg-botanical-600"></span>
+                <span>Check-In</span>
+                <span class="text-[11px] font-normal text-ink-600 hidden xs:inline">Arrival</span>
+              </button>
+              <button type="button" id="mode-checkout-btn" onclick="setAttendanceMode('check-out')" class="py-1.5 px-3 rounded-lg text-ink-600 hover:text-ink-900 text-[13px] font-medium flex items-center justify-center gap-2 transition-all">
+                <span class="w-2 h-2 rounded-full bg-terracotta-600"></span>
+                <span>Check-Out</span>
+                <span class="text-[11px] font-normal text-ink-400 hidden xs:inline">Departure</span>
+              </button>
+            </div>
           </div>
 
           <!-- Active duty banner (shown when worker is currently checked in) -->
-          <div id="activeCheckInBanner" class="active-checkin-banner" style="display:none;">
-            <div class="active-checkin-content">
-              <span class="active-checkin-icon">⏱️</span>
-              <div class="active-checkin-text">
-                <strong id="activeCheckInSite">Currently on Duty</strong>
-                <span id="activeCheckInTime">Checked in --</span>
-              </div>
+          <div id="active-duty-banner" class="hidden px-3.5 py-2 bg-emerald-50/90 border-t border-emerald-100 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-1.5 text-emerald-900 min-w-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+              <span class="truncate">On Duty at <strong id="active-duty-site">--</strong> since <span id="active-duty-time">--</span></span>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-checkout" onclick="setPunchType('CHECK-OUT')">
-              Ready to Leave? Check Out →
-            </button>
-          </div>
-        </div>
-
-        <!-- Live Timestamp & GPS Card -->
-        <div class="card meta-card">
-          <div class="meta-row">
-            <div class="meta-item">
-              <span class="meta-label">Current Timestamp</span>
-              <span class="meta-value" id="liveTimestampDisplay">Acquiring time...</span>
-            </div>
-            <button type="button" class="btn-icon" id="btnRefreshGps" onclick="refreshGpsLocation()" title="Refresh GPS">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
+            <button type="button" onclick="setAttendanceMode('check-out')" class="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 underline shrink-0 ml-2">
+              Check Out →
             </button>
           </div>
 
-          <!-- GPS Status & Coordinates -->
-          <div class="gps-status-box" id="gpsStatusBox">
-            <div class="gps-indicator">
-              <span class="gps-dot waiting" id="gpsDot"></span>
-              <span id="gpsStatusText">Acquiring GPS location...</span>
+          <!-- Hairline Divider + Sleek GPS Telemetry Row -->
+          <div class="px-3.5 py-2.5 border-t border-gray-100 flex items-center justify-between gap-3 bg-[#FAFAFA]/60">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-botanical-600 dot-pulse shrink-0"></span>
+                <span id="gps-address-text" class="text-[12.5px] font-medium text-ink-900 truncate">
+                  Locating GPS position...
+                </span>
+              </div>
+              <div class="flex items-center gap-2 mt-0.5 pl-3.5 text-[11px] font-mono text-ink-600">
+                <span id="gps-coords-text">--.-----, --.-----</span>
+                <span class="text-gray-300">•</span>
+                <span id="gps-accuracy-label" class="text-botanical-700 font-medium">±--m</span>
+                <span class="text-gray-300">•</span>
+                <span id="live-date-timestamp" class="text-ink-400">Loading...</span>
+              </div>
             </div>
-            <!-- Human-Readable Address -->
-            <div class="gps-address-box" id="gpsAddressBox" style="display:none;">
-              <span class="gps-address-icon">📍</span>
-              <span class="gps-address-text" id="gpsAddressText">Resolving address...</span>
+
+            <button type="button" onclick="refreshGpsLock()" title="Refresh GPS" class="w-7 h-7 rounded-full hover:bg-gray-200/70 text-ink-600 hover:text-ink-900 flex items-center justify-center transition active:scale-95 shrink-0">
+              <i id="refresh-gps-icon" data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- 3. COMPACT IDENTITY & SUPERVISOR ACCORDION -->
+        <section id="profile-card" class="bg-white rounded-2xl border border-[#E5E7EB] shadow-minimal overflow-hidden transition-all">
+          <!-- Default Clean Summary Row -->
+          <div onclick="toggleProfileAccordion()" class="px-3.5 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-50/60 transition select-none">
+            <div class="flex items-center gap-3 min-w-0">
+              <div id="worker-avatar" class="w-9 h-9 rounded-full bg-stone-100 border border-stone-200/80 text-ink-900 font-semibold text-xs flex items-center justify-center shrink-0 tracking-tight">
+                FW
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span id="summary-worker-name" class="text-[13.5px] font-semibold text-ink-900 truncate">Field Worker</span>
+                  <span class="text-xs text-ink-400 font-mono" id="summary-worker-id">(ID)</span>
+                </div>
+                <p class="text-[12px] text-ink-600 truncate">
+                  Supervisor: <span id="summary-supervisor-name" class="font-medium text-ink-900">Unassigned</span>
+                </p>
+              </div>
             </div>
-            <div class="gps-coords" id="gpsCoordsText">Lat: -- | Lng: --</div>
+
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-medium text-ink-600 hover:text-ink-900 bg-gray-100/80 hover:bg-gray-200/70 transition flex items-center gap-1 shrink-0">
+              <span id="profile-edit-label">Edit</span>
+              <i id="profile-chevron" data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200"></i>
+            </button>
           </div>
 
-          <!-- Insecure HTTP GPS Warning & Manual Coordinates Fallback -->
-          <div id="gpsHelpContainer" class="gps-help-box" style="display:none;">
-            <p id="gpsHelpMessage" class="gps-help-text"></p>
-            <div class="gps-help-actions">
-              <button type="button" class="btn btn-sm btn-outline" id="btnToggleManualCoords" onclick="toggleManualCoordinates()">
-                Enter Coords Manually
-              </button>
-              <a href="#" id="gpsHttpsLink" class="btn btn-sm btn-primary" style="display:none;">
-                Use HTTPS for Auto-GPS
-              </a>
-            </div>
-
-            <div id="manualCoordsFields" style="display:none; margin-top:10px;">
-              <div class="manual-coords-grid">
-                <div>
-                  <label class="form-label" style="font-size:0.75rem;">Latitude</label>
-                  <input type="number" step="any" id="manualLatInput" class="form-input form-input-sm" placeholder="e.g. 28.6139" oninput="handleManualCoordsChange()">
+          <!-- Expandable Form Fields -->
+          <div id="profile-collapse-container" class="collapse-grid">
+            <div class="collapse-inner">
+              <div class="px-3.5 pb-3.5 pt-2.5 border-t border-gray-100 space-y-3 bg-[#FAFAFA]/50">
+                <div class="grid grid-cols-1 gap-2.5">
+                  <div>
+                    <label for="worker-name" class="block text-[11.5px] font-medium text-ink-600 mb-1">Worker Full Name *</label>
+                    <input type="text" id="worker-name" placeholder="e.g. Abhiroop Agarwal" oninput="syncProfileSummary()" class="w-full px-3 py-2 text-[13.5px] bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-botanical-600 focus:ring-2 focus:ring-botanical-600/10 text-ink-900 transition" />
+                  </div>
+                  <div>
+                    <label for="worker-id" class="block text-[11.5px] font-medium text-ink-600 mb-1">Worker ID / Phone Number *</label>
+                    <input type="tel" id="worker-id" placeholder="e.g. 9719003001" oninput="syncProfileSummary()" onchange="onWorkerIdChange()" class="w-full px-3 py-2 text-[13.5px] font-mono bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-botanical-600 focus:ring-2 focus:ring-botanical-600/10 text-ink-900 transition" />
+                  </div>
                 </div>
-                <div>
-                  <label class="form-label" style="font-size:0.75rem;">Longitude</label>
-                  <input type="number" step="any" id="manualLngInput" class="form-input form-input-sm" placeholder="e.g. 77.2090" oninput="handleManualCoordsChange()">
+
+                <div class="grid grid-cols-2 gap-2.5 pt-1">
+                  <div>
+                    <label for="supervisor-name" class="block text-[11.5px] font-medium text-ink-600 mb-1">Supervisor Name *</label>
+                    <input type="text" id="supervisor-name" placeholder="e.g. Firdous" oninput="syncProfileSummary()" class="w-full px-3 py-2 text-[13.5px] bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-botanical-600 focus:ring-2 focus:ring-botanical-600/10 text-ink-900 transition" />
+                  </div>
+                  <div>
+                    <label for="supervisor-contact" class="block text-[11.5px] font-medium text-ink-600 mb-1">Supervisor Phone</label>
+                    <input type="text" id="supervisor-contact" placeholder="Optional" oninput="syncProfileSummary()" class="w-full px-3 py-2 text-[13.5px] bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-botanical-600 focus:ring-2 focus:ring-botanical-600/10 text-ink-900 transition" />
+                  </div>
+                </div>
+
+                <div class="pt-1 flex items-center justify-between">
+                  <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="remember-profile" checked onchange="syncProfileSummary()" class="w-3.5 h-3.5 rounded text-botanical-600 border-gray-300 focus:ring-botanical-600" />
+                    <span class="text-xs text-ink-600">Remember details on this phone</span>
+                  </label>
+                  <button type="button" onclick="toggleProfileAccordion()" class="text-xs font-semibold text-botanical-700 hover:text-botanical-900 px-2 py-1">
+                    Done
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- Photograph Capture Card -->
-        <div class="card photo-card">
-          <div class="card-header-row">
-            <span class="card-title">Field Photograph *</span>
-            <span class="card-badge" id="photoStatusBadge">Photo Required</span>
-          </div>
-          <p class="card-desc">Take a verification photo or selfie at the field visit site.</p>
-
-          <!-- Camera Stream / Preview Box -->
-          <div class="camera-viewport" id="cameraViewport">
-            <!-- Live Video (when WebRTC is active) -->
-            <video id="cameraVideo" autoplay playsinline muted class="camera-video" style="display:none;"></video>
-            <!-- Canvas for snapshot & compression -->
-            <canvas id="cameraCanvas" style="display:none;"></canvas>
-            <!-- Image Preview -->
-            <img id="photoPreviewImg" alt="Captured field photo" class="photo-preview-img" style="display:none;">
-
-            <!-- Watermark Preview -->
-            <div class="photo-watermark" id="photoWatermark" style="display:none;">
-              <span id="watermarkTime"></span>
-              <span id="watermarkCoords"></span>
+        <!-- 4. MINIMAL PHOTO CAPTURE MODULE -->
+        <section id="photo-card" class="bg-white rounded-2xl border border-[#E5E7EB] shadow-minimal p-3.5 transition-all">
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="flex items-center gap-1.5">
+              <h2 class="text-[13.5px] font-semibold text-ink-900">Field Photograph</h2>
+              <span class="text-xs text-ink-400">*</span>
             </div>
-
-            <!-- Viewport Placeholder -->
-            <div class="camera-placeholder" id="cameraPlaceholder">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-              </svg>
-              <span>Tap below to capture photo</span>
-            </div>
+            <span id="photo-status-badge" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-ink-600">
+              Required
+            </span>
           </div>
 
-          <!-- Camera Controls (Works on both HTTP and HTTPS!) -->
-          <div class="camera-actions">
-            <!-- State 1: When no photo is taken -->
-            <div class="btn-group-vertical" id="cameraInitGroup">
-              <!-- Primary Action: Native Smartphone Camera (Works on ANY phone & HTTP/HTTPS) -->
-              <label class="btn btn-primary btn-block file-upload-btn" id="btnNativeCamera">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                  <circle cx="12" cy="13" r="4"></circle>
-                </svg>
-                <span>Take Photo (Phone Camera)</span>
-                <!-- capture="environment" launches rear camera, works on iOS Safari & Android Chrome -->
-                <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleFileSelect(event)">
-              </label>
+          <!-- Hidden File Inputs -->
+          <input type="file" id="native-gallery-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)" />
+          <input type="file" id="native-camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelect(event)" />
 
-              <!-- Secondary Actions: Live Viewfinder (if supported) & Gallery -->
-              <div class="btn-group">
-                <button type="button" class="btn btn-outline" id="btnLiveCamera" onclick="startLiveCamera()">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                  </svg>
-                  Live Viewfinder
-                </button>
+          <!-- STATE A: Refined 16:10 Soft Slate Surface -->
+          <div id="photo-empty-state" class="space-y-2.5">
+            <div onclick="handlePhotoSurfaceClick()" class="group relative aspect-[16/10] w-full rounded-xl bg-[#F3F4F6] hover:bg-[#EFECE6]/70 border border-dashed border-[#D1D5DB] hover:border-botanical-600/60 flex flex-col items-center justify-center text-center cursor-pointer transition-all p-4">
+              <div class="w-10 h-10 rounded-full bg-white shadow-minimal border border-gray-200/80 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                <i data-lucide="camera" class="w-4 h-4 text-ink-900"></i>
+              </div>
+              <span class="text-[13px] font-medium text-ink-900">Tap to capture verification photo</span>
+              <span class="text-[11px] text-ink-600 mt-0.5">Auto-stamps GPS location &amp; timestamp</span>
+            </div>
 
-                <label class="btn btn-outline file-upload-btn">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                  </svg>
-                  Gallery
-                  <input type="file" id="galleryInput" accept="image/*" onchange="handleFileSelect(event)">
-                </label>
+            <!-- Quiet Secondary Pill Actions -->
+            <div class="flex items-center justify-center gap-2">
+              <button type="button" onclick="startLiveCamera()" class="flex-1 py-1.5 px-3 rounded-lg bg-[#F9FAFB] hover:bg-gray-100 text-ink-600 hover:text-ink-900 border border-gray-200/80 text-xs font-medium flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="video" class="w-3.5 h-3.5"></i>
+                <span>Live Camera</span>
+              </button>
+              <button type="button" onclick="document.getElementById('native-gallery-input').click()" class="flex-1 py-1.5 px-3 rounded-lg bg-[#F9FAFB] hover:bg-gray-100 text-ink-600 hover:text-ink-900 border border-gray-200/80 text-xs font-medium flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                <span>Upload</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- STATE B: Live Camera Stream -->
+          <div id="photo-live-state" class="hidden space-y-2.5">
+            <div class="relative rounded-xl overflow-hidden bg-ink-900 aspect-[16/10]">
+              <video id="camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+              <div class="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-[10px] font-mono text-white/90 bg-black/50 backdrop-blur-xs px-2.5 py-1 rounded-md">
+                <span id="live-camera-telemetry">GPS Active</span>
+                <span class="text-botanical-500 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-botanical-500 animate-pulse"></span>
+                  LIVE
+                </span>
               </div>
             </div>
-
-            <!-- State 2: When live viewfinder is running -->
-            <div class="camera-live-controls" id="cameraLiveControls" style="display:none;">
-              <button type="button" class="btn-icon-round" onclick="switchCameraFacing()" title="Flip Camera">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 2.21.895 4.21 2.343 5.657L4 20h4.343"></path>
-                  <path d="M4 14c0 4.418 3.582 8 8 8s8-3.582 8-8c0-2.21-.895-4.21-2.343-5.657L20 4h-4.343"></path>
-                </svg>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="snapFromLiveVideo()" class="flex-1 py-2 px-3 rounded-xl bg-ink-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.99] transition">
+                <i data-lucide="aperture" class="w-3.5 h-3.5"></i>
+                <span>Capture Photo</span>
               </button>
-
-              <button type="button" class="shutter-btn" onclick="captureSnapshot()" title="Capture Photo">
-                <span class="shutter-inner"></span>
-              </button>
-
-              <button type="button" class="btn-icon-round" onclick="stopLiveCamera()" title="Cancel">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-
-            <!-- State 3: When photo has been captured -->
-            <div class="btn-group" id="cameraRetakeGroup" style="display:none;">
-              <button type="button" class="btn btn-outline btn-block" onclick="retakePhoto()">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 4v6h6"></path>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                Retake Photo
+              <button type="button" onclick="stopLiveCamera()" class="py-2 px-3 rounded-xl bg-gray-100 text-ink-600 hover:text-ink-900 text-xs font-medium transition">
+                Cancel
               </button>
             </div>
           </div>
-        </div>
 
-        <!-- Field Worker Details Card -->
-        <div class="card">
-          <div class="card-title">Field Worker Details</div>
-          
-          <div class="form-group">
-            <label for="workerName" class="form-label">Worker Full Name *</label>
-            <input type="text" id="workerName" class="form-input" placeholder="e.g. Rahul Verma" required>
-          </div>
-
-          <div class="form-group">
-            <label for="workerId" class="form-label">Worker ID / Phone Number *</label>
-            <input type="text" id="workerId" class="form-input" placeholder="e.g. JKLFDP-101 or +91 9876543210" required>
-          </div>
-
-          <div class="form-check">
-            <input type="checkbox" id="rememberMeCheck" checked>
-            <label for="rememberMeCheck">Remember my name & supervisor details on this phone</label>
-          </div>
-        </div>
-
-        <!-- Purpose & Site Details Card -->
-        <div class="card">
-          <div class="card-title">Visit & Location Details</div>
-
-          <div class="form-group">
-            <label for="purposeInput" class="form-label" id="purposeLabel">Purpose of Visit / Duty *</label>
-            <input type="text" id="purposeInput" class="form-input" placeholder="e.g. Beneficiary Survey, Relief Distribution, Site Inspection" required>
-          </div>
-
-          <div class="form-group">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
-              <label for="siteName" class="form-label" style="margin-bottom:0;">Village / Site / Location Name *</label>
-              <span class="auto-fill-tag" id="siteAutoTag" style="display:none;">Auto-detected from GPS ✓</span>
+          <!-- STATE C: Captured Watermarked Canvas Preview -->
+          <div id="photo-preview-state" class="hidden space-y-2">
+            <div class="relative rounded-xl overflow-hidden border border-gray-200 bg-ink-900 aspect-[16/10] cursor-pointer" onclick="openFullPhotoModal()">
+              <canvas id="geotag-canvas" width="800" height="500" class="w-full h-full object-cover block"></canvas>
             </div>
-            <input type="text" id="siteName" class="form-input" placeholder="Auto-filling from location..." required>
+            <div class="flex items-center justify-between pt-0.5">
+              <button type="button" onclick="cycleSimulatedScene()" class="text-xs font-medium text-ink-600 hover:text-ink-900 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-gray-100 transition">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Change demo scene</span>
+              </button>
+              <button type="button" onclick="resetPhotoCapture()" class="text-xs font-medium text-rose-600 hover:text-rose-700 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-rose-50 transition">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                <span>Retake</span>
+              </button>
+            </div>
           </div>
+        </section>
 
-          <div class="form-group">
-            <label for="notesInput" class="form-label">Field Notes / Remarks (Optional)</label>
-            <textarea id="notesInput" class="form-input" rows="2" placeholder="e.g. Distributed 45 ration kits; surveyed 12 families"></textarea>
-          </div>
-        </div>
-
-        <!-- Supervisor Details Card -->
-        <div class="card">
-          <div class="card-title">Supervisor Details</div>
-
-          <div class="form-group">
-            <label for="supervisorName" class="form-label">Supervisor Name *</label>
-            <input type="text" id="supervisorName" class="form-input" placeholder="e.g. Anjali Mehta" required>
-          </div>
-
-          <div class="form-group">
-            <label for="supervisorContact" class="form-label">Supervisor Phone / Email</label>
-            <input type="text" id="supervisorContact" class="form-input" placeholder="e.g. +91 9123456789 or anjali@ngo.org">
-          </div>
-        </div>
-
-        <!-- Submit Button -->
-        <div class="submit-container">
-          <button type="submit" class="btn btn-primary btn-submit btn-checkin" id="submitBtn">
-            <svg id="submitBtnIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            <span id="submitBtnText">PUNCH CHECK-IN</span>
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <!-- TAB 2: WORKER'S PERSONAL HISTORY (PRIVATE TO EACH WORKER) -->
-    <section id="sectionRecords" class="tab-section" style="display:none;">
-      
-      <!-- Worker History Card -->
-      <div class="card worker-history-card">
-        <div class="worker-history-header">
+        <!-- 5. STREAMLINED VISIT & DUTY FORM -->
+        <section id="visit-card" class="bg-white rounded-2xl border border-[#E5E7EB] shadow-minimal p-3.5 space-y-3.5 transition-all">
+          <!-- Purpose of Visit + 4 Subtle One-Tap Suggestion Chips -->
           <div>
-            <div class="card-title">My Attendance History</div>
-            <p class="sheet-desc" id="workerHistorySubtitle">Only your verified attendance records on this device are shown here.</p>
+            <label for="visit-purpose" class="block text-[12.5px] font-semibold text-ink-900 mb-1.5">
+              Purpose of Visit / Duty <span class="text-ink-400 font-normal">*</span>
+            </label>
+            <div class="relative">
+              <input type="text" id="visit-purpose" oninput="updateReadinessState()" placeholder="e.g. Beneficiary Survey, Relief Distribution" class="w-full px-3 py-2 text-[13.5px] bg-[#F9FAFB] focus:bg-white border border-[#E5E7EB] rounded-xl focus:outline-none focus:border-botanical-600 focus:ring-3 focus:ring-botanical-600/10 text-ink-900 placeholder-ink-400 transition" />
+              <button type="button" id="clear-purpose-btn" onclick="clearPurposeInput()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 p-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+
+            <!-- 4 Minimal Suggestion Chips -->
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              <button type="button" onclick="selectPurposeChip(this, 'Beneficiary Survey')" class="purpose-chip px-2.5 py-1 rounded-lg text-[11.5px] font-medium bg-[#F3F4F6] text-ink-600 hover:text-ink-900 border border-transparent transition">
+                Beneficiary Survey
+              </button>
+              <button type="button" onclick="selectPurposeChip(this, 'Relief Distribution')" class="purpose-chip px-2.5 py-1 rounded-lg text-[11.5px] font-medium bg-[#F3F4F6] text-ink-600 hover:text-ink-900 border border-transparent transition">
+                Relief Distribution
+              </button>
+              <button type="button" onclick="selectPurposeChip(this, 'Site Inspection')" class="purpose-chip px-2.5 py-1 rounded-lg text-[11.5px] font-medium bg-[#F3F4F6] text-ink-600 hover:text-ink-900 border border-transparent transition">
+                Site Inspection
+              </button>
+              <button type="button" onclick="selectPurposeChip(this, 'Health Camp')" class="purpose-chip px-2.5 py-1 rounded-lg text-[11.5px] font-medium bg-[#F3F4F6] text-ink-600 hover:text-ink-900 border border-transparent transition">
+                Health Camp
+              </button>
+            </div>
           </div>
-          <button type="button" class="btn btn-sm btn-outline" onclick="loadWorkerHistory(true)">
-            ↻ Refresh
+
+          <!-- Village / Site Name with Quiet Inline Badge -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="location-name" class="block text-[12.5px] font-semibold text-ink-900">
+                Village / Site Name <span class="text-ink-400 font-normal">*</span>
+              </label>
+              <span id="site-verified-badge" class="text-[11px] font-medium text-botanical-700 bg-botanical-50 px-2 py-0.5 rounded-md">
+                GPS Verified ✓
+              </span>
+            </div>
+            <input type="text" id="location-name" value="Chadoora" oninput="onSiteNameInput()" placeholder="Enter village or site name" class="w-full px-3 py-2 text-[13.5px] bg-[#F9FAFB] focus:bg-white border border-[#E5E7EB] rounded-xl focus:outline-none focus:border-botanical-600 focus:ring-3 focus:ring-botanical-600/10 text-ink-900 font-medium transition" />
+          </div>
+
+          <!-- Field Notes (Auto-sizing minimal textarea) -->
+          <div>
+            <label for="field-notes" class="block text-[12.5px] font-semibold text-ink-900 mb-1.5">
+              Field Notes <span class="text-[11.5px] font-normal text-ink-400">(Optional)</span>
+            </label>
+            <textarea id="field-notes" rows="2" oninput="autoResizeTextarea(this)" placeholder="e.g. Distributed 45 ration kits; surveyed 12 families" class="w-full px-3 py-2 text-[13.5px] bg-[#F9FAFB] focus:bg-white border border-[#E5E7EB] rounded-xl focus:outline-none focus:border-botanical-600 focus:ring-3 focus:ring-botanical-600/10 text-ink-900 placeholder-ink-400 transition resize-none overflow-hidden"></textarea>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 2: WORKING HISTORY TAB                -->
+      <!-- ========================================== -->
+      <div id="view-history" class="hidden space-y-3">
+        <!-- Worker Identity Filter Banner -->
+        <div id="history-identity-banner" class="bg-white rounded-2xl border border-[#E5E7EB] shadow-minimal p-3.5 flex items-center justify-between">
+          <div class="min-w-0">
+            <div class="text-[13px] font-semibold text-ink-900 flex items-center gap-1.5">
+              <span>Attendance History</span>
+              <span id="history-worker-id-badge" class="text-xs font-mono px-2 py-0.5 rounded-md bg-stone-100 text-ink-600">--</span>
+            </div>
+            <p class="text-[11px] text-ink-600 mt-0.5 truncate">Verified check-in &amp; check-out logs for this worker</p>
+          </div>
+          <button type="button" onclick="loadWorkerHistory(true)" title="Refresh History" class="p-1.5 rounded-lg text-ink-600 hover:text-ink-900 hover:bg-gray-100 transition">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
           </button>
         </div>
 
-        <div id="workerIdentityBanner" class="worker-identity-banner" style="display:none;">
-          <span>👤 Viewing history for Worker ID:</span>
-          <strong id="displayWorkerIdBadge">--</strong>
+        <!-- Filter Segmented Tabs: All / Check-In / Check-Out -->
+        <div class="grid grid-cols-3 p-1 bg-[#F3F4F6] rounded-xl text-xs font-medium">
+          <button type="button" id="history-filter-all" onclick="setHistoryFilter('ALL')" class="py-1.5 rounded-lg bg-white text-ink-900 shadow-minimal font-semibold transition">
+            All (<span id="history-count-all">0</span>)
+          </button>
+          <button type="button" id="history-filter-in" onclick="setHistoryFilter('CHECK-IN')" class="py-1.5 rounded-lg text-ink-600 hover:text-ink-900 transition">
+            Check-In (<span id="history-count-in">0</span>)
+          </button>
+          <button type="button" id="history-filter-out" onclick="setHistoryFilter('CHECK-OUT')" class="py-1.5 rounded-lg text-ink-600 hover:text-ink-900 transition">
+            Check-Out (<span id="history-count-out">0</span>)
+          </button>
         </div>
 
-        <div id="workerIdMissingNotice" class="worker-prompt-box" style="display:none;">
-          <p>Please enter your <strong>Worker ID</strong> on the Mark Attendance tab to view your punches.</p>
-          <button type="button" class="btn btn-sm btn-primary" onclick="switchTab('mark')">Go to Mark Attendance</button>
+        <!-- Empty State -->
+        <div id="history-empty-state" class="bg-white rounded-2xl border border-[#E5E7EB] shadow-minimal p-8 text-center space-y-2.5">
+          <div class="w-10 h-10 rounded-full bg-stone-100 text-ink-600 flex items-center justify-center mx-auto">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-[13.5px] font-semibold text-ink-900">No attendance logs yet</h3>
+            <p class="text-xs text-ink-600 max-w-[230px] mx-auto">
+              Your verified check-in and check-out punches for today will appear here.
+            </p>
+          </div>
+          <div class="pt-1">
+            <button type="button" onclick="switchTab('mark')" class="px-3.5 py-1.5 rounded-lg bg-ink-900 text-white text-xs font-medium hover:bg-ink-600 transition">
+              Mark Attendance
+            </button>
+          </div>
         </div>
+
+        <!-- History Log Cards -->
+        <div id="history-list" class="space-y-2.5"></div>
       </div>
 
-      <!-- Worker's Records Filter Pills -->
-      <div class="records-filter-pills" id="workerFilterPills" style="display:none;">
-        <button type="button" class="filter-pill active" id="pillFilterAll" onclick="setRecordFilter('ALL')">
-          All My Punches (<span id="countAllPill">0</span>)
+    </main>
+
+    <!-- 6. NON-OVERLAPPING STICKY FROSTED BOTTOM BAR -->
+    <div id="bottom-action-dock" class="sticky bottom-0 z-30 bg-white/85 backdrop-blur-md border-t border-gray-200/80 px-4 pt-2.5 pb-4">
+      <div class="flex items-center justify-between mb-2 text-[11.5px]">
+        <span id="readiness-helper-text" class="text-ink-600 flex items-center gap-1.5">
+          <span id="readiness-dot" class="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
+          <span>Capture photo &amp; select purpose to check in</span>
+        </span>
+        <button type="button" id="quick-fill-btn" onclick="fillDemoState()" class="text-botanical-700 font-medium hover:underline">
+          Demo Fill
         </button>
-        <button type="button" class="filter-pill" id="pillFilterCheckIn" onclick="setRecordFilter('CHECK-IN')">
-          🟢 Check-Ins (<span id="countCheckInPill">0</span>)
-        </button>
-        <button type="button" class="filter-pill" id="pillFilterCheckOut" onclick="setRecordFilter('CHECK-OUT')">
-          🔴 Check-Outs (<span id="countCheckOutPill">0</span>)
-        </button>
       </div>
 
-      <!-- Worker's Personal Records Feed List -->
-      <div id="recordsList" class="records-container">
-        <!-- Injected dynamically with only current worker's punches -->
-      </div>
-    </section>
-  </main>
+      <button type="button" id="punch-submit-btn" onclick="handlePunchSubmit()" class="w-full py-3 px-4 rounded-xl bg-[#065F46] hover:bg-[#047857] active:scale-[0.99] text-white font-semibold text-[14px] tracking-tight shadow-sm flex items-center justify-center gap-2 transition-all">
+        <span id="punch-btn-dot" class="w-2 h-2 rounded-full bg-botanical-400"></span>
+        <span id="punch-btn-text">Punch Check-In</span>
+      </button>
+    </div>
 
-  <!-- Success Modal -->
-  <div class="modal-backdrop" id="successModal" style="display:none;">
-    <div class="modal-sheet modal-success">
-      <div class="success-icon-wrap">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      </div>
-      <h3 class="modal-title text-center">Attendance Marked!</h3>
-      <p class="modal-desc text-center" id="successSubtitle">Your check-in has been successfully recorded.</p>
-
-      <div class="success-details" id="successDetails">
-        <!-- Injected dynamically -->
-      </div>
-
-      <div class="btn-group">
-        <button type="button" class="btn btn-primary" onclick="closeSuccessModalAndReset()">
-          New Check-In
-        </button>
-        <button type="button" class="btn btn-outline" onclick="closeSuccessModalAndGoToRecords()">
-          View My History
+    <!-- MINIMAL FLOATING TOAST -->
+    <div id="toast-banner" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 max-w-[360px] w-[90%] pointer-events-none opacity-0 -translate-y-2 transition-all duration-200">
+      <div class="bg-ink-900 text-white px-3.5 py-2.5 rounded-xl shadow-lg flex items-center justify-between gap-3 text-xs font-medium pointer-events-auto">
+        <span id="toast-message">Notification</span>
+        <button id="toast-action-btn" onclick="fillDemoState()" class="hidden text-botanical-400 font-semibold hover:underline shrink-0">
+          Auto-fill
         </button>
       </div>
     </div>
-  </div>
 
-  <!-- Toast Notification -->
-  <div id="toast" class="toast" style="display:none;"></div>
+    <!-- MINIMAL RECEIPT SHEET MODAL -->
+    <div id="receipt-modal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="bg-white w-full max-w-[390px] rounded-t-3xl sm:rounded-2xl shadow-float border border-gray-200 overflow-hidden p-4 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div id="receipt-icon-wrap" class="w-7 h-7 rounded-full bg-botanical-50 text-botanical-700 flex items-center justify-center">
+              <i data-lucide="check" class="w-4 h-4 stroke-[2.5]"></i>
+            </div>
+            <div>
+              <h3 id="receipt-title" class="text-[14px] font-semibold text-ink-900 leading-tight">Attendance Verified</h3>
+              <p id="receipt-subtitle" class="text-[11px] font-mono text-ink-600">#JKL-8492</p>
+            </div>
+          </div>
+          <button onclick="closeReceiptModal('mark')" class="text-ink-400 hover:text-ink-900 p-1">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
 
-  <!-- Photo Full Preview Modal -->
-  <div class="modal-backdrop" id="photoModal" style="display:none;" onclick="closePhotoModal()">
-    <div class="photo-modal-content">
-      <img id="fullPhotoImg" src="" alt="Full attendance photo">
-      <div class="photo-modal-meta" id="photoModalMeta"></div>
+        <div class="rounded-xl overflow-hidden border border-gray-200 aspect-[16/10] bg-ink-900 cursor-pointer" onclick="openPhotoModal(document.getElementById('receipt-photo-img').src, document.getElementById('receipt-worker').textContent, document.getElementById('receipt-subtitle').textContent)">
+          <img id="receipt-photo-img" src="" alt="Watermarked Verification Photo" class="w-full h-full object-cover" />
+        </div>
+
+        <div class="bg-[#F9FAFB] rounded-xl p-3 border border-gray-200/70 space-y-1.5 text-xs">
+          <div class="flex justify-between">
+            <span class="text-ink-600">Worker</span>
+            <span id="receipt-worker" class="font-medium text-ink-900">--</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-ink-600">Purpose</span>
+            <span id="receipt-purpose" class="font-medium text-ink-900">--</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-ink-600">Location</span>
+            <span id="receipt-location" class="font-mono text-[11px] text-ink-900 truncate max-w-[220px]">--</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="closeReceiptModal('history')" class="py-2.5 px-3 rounded-xl bg-ink-900 text-white text-xs font-semibold hover:bg-ink-600 transition">
+            View History
+          </button>
+          <button type="button" onclick="closeReceiptModal('mark')" class="py-2.5 px-3 rounded-xl bg-gray-100 text-ink-900 text-xs font-medium hover:bg-gray-200 transition">
+            Done
+          </button>
+        </div>
+      </div>
     </div>
+
+    <!-- FULL PHOTO PREVIEW MODAL -->
+    <div id="photo-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePhotoModal()">
+      <div class="relative max-w-[500px] w-full bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10" onclick="event.stopPropagation()">
+        <button onclick="closePhotoModal()" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+        <img id="full-photo-img" src="" alt="Full preview" class="w-full max-h-[75vh] object-contain">
+        <div class="p-3 bg-neutral-900 text-white text-xs space-y-0.5">
+          <div id="photo-modal-title" class="font-semibold text-neutral-100"></div>
+          <div id="photo-modal-subtitle" class="font-mono text-[11px] text-neutral-400"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
+  <!-- APPLICATION LOGIC -->
   <script src="app.js"></script>
 </body>
 </html>
